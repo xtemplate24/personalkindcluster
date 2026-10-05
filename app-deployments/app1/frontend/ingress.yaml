@@ -14,9 +14,9 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - xtemplate.tail9d78f5.ts.net
+        - xtemplate.cc
   rules:
-    - host: xtemplate.tail9d78f5.ts.net
+    - host: xtemplate.cc
       http:
         paths:
           - path: /app1

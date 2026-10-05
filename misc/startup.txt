@@ -9,3 +9,48 @@ sudo systemctl restart tailscaled
 sudo tailscale funnel reset
 sudo tailscale funnel --bg https+insecure://localhost:443
 tailscale funnel status
+
+
+
+docker run cloudflare/cloudflared:latest tunnel --no-autoupdate run --token 
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared-tunnel
+  namespace: cloudflare
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        args:
+        - tunnel
+        - --no-autoupdate
+        - run
+        env:
+        - name: TUNNEL_TOKEN
+          value: "eyJhIjoiM2ZiZWFlYzBiZTAzY2I5MTU3OWY0MWIwYzQ3MjgwZTMiLCJ0IjoiOWIwMGRkNTktYTBlZC00Nzk1LWI1NGYtMzAxYjA4MWVjNjU1IiwicyI6Ik5ERmxZMlppTlRRdE9ERTFZaTAwWWpaaExXSmlaRGd0TVdWbU9Ua3paV0kxTW1VeCJ9"
+---
+# We expose a small cluster service so cloudflared can talk to Traefik if needed
+apiVersion: v1
+kind: Service
+metadata:
+  name: cloudflared-svc
+  namespace: cloudflare
+spec:
+  selector:
+    app: cloudflared
+  ports:
+  - port: 80
+    targetPort: 80

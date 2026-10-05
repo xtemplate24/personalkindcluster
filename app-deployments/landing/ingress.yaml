@@ -10,9 +10,9 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - xtemplate.lab
+        - xtemplate.cc
   rules:
-    - host: xtemplate.lab
+    - host: xtemplate.cc
       http:
         paths:
           - path: /

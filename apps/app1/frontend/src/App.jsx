@@ -132,6 +132,15 @@ export default function App() {
               )}${result.source === "custom" ? " (custom)" : ""}`
             : ""}
         </p>
+        <p className={`result${error ? " error" : ""}`} aria-live="polite">
+          {error
+            ? error
+            : result
+            ? `${result.to} to ${result.from} rate — ${result.rate.toFixed(
+                6
+              )}${result.source === "custom" ? " (custom)" : ""}`
+            : ""}
+        </p>
       </main>
     </div>
   );

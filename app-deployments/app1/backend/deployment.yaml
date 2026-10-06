@@ -22,7 +22,7 @@ spec:
       containers:
         - name: backend
           # Swap image/port/probe path for whatever your API stack actually uses.
-          image: ghcr.io/xtemplate24/app1-backend@sha256:fa7b4ec02a4481c107e039b3a895086130930857091eaa2dd86040cfc73ac6a4
+          image: ghcr.io/xtemplate24/app1-backend@sha256:0a2e378473a1340f4a00724161d618bea0dd3d54cae1ca912f65cda833e3a478
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

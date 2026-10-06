@@ -76,6 +76,7 @@ app.post("/api/convert", async (req, res) => {
       to: toCode,
       amount: numericAmount,
       rate: result / numericAmount,
+      exrate: numericAmount / result,
       result,
       source: "frankfurter.app",
     });

@@ -136,7 +136,7 @@ export default function App() {
           {error
             ? error
             : result
-            ? `${result.to} to ${result.from} rate — ${result.rate.toFixed(
+            ? `${result.to} to ${result.from} rate — ${result.exrate.toFixed(
                 6
               )}${result.source === "custom" ? " (custom)" : ""}`
             : ""}

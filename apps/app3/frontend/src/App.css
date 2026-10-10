@@ -35,7 +35,7 @@
   --aurora-3: rgba(143,168,255,0.28);
   --aurora-4: rgba(224,122,159,0.22);
 
-  --aurora-blur: 60px;
+  --aurora-blur: 40px;
 }
 
 * { box-sizing: border-box; }
@@ -80,7 +80,7 @@ body::before {
   filter: blur(var(--aurora-blur));
 
   animation:
-    auroraFlow 35s ease-in-out infinite alternate;
+    auroraFlow 10s ease-in-out infinite alternate;
   mix-blend-mode: normal;
 }
 
@@ -108,7 +108,7 @@ body::after {
   opacity: 0.7;
 
   animation:
-    auroraFlowReverse 45s linear infinite;
+    auroraFlowReverse 10s linear infinite;
   mix-blend-mode: normal;
 }
 

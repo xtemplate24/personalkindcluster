@@ -129,7 +129,16 @@ export default function App() {
 
         {screen === "mode" && (
           <section>
-            <h1>{exercise}</h1>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <h1 style={{ margin: 0 }}>{exercise}</h1>
+              <button 
+                className="secondary-btn" /* Feel free to swap with an existing small button class */
+                onClick={() => setScreen("plan")}
+                style={{ padding: "0.5rem 1rem", cursor: "pointer" }}
+              >
+                {plan ? "Change plan" : "Set training plan"}
+              </button>
+            </div>
             <p className="muted">
               {max === null ? "No assessment yet." : `Current max: ${max} reps`}
               {" · "}
@@ -138,7 +147,6 @@ export default function App() {
             <div className="grid">
               <button style={{ "--i": 0 }} className="big" onClick={() => setScreen("assess")}>Assessment</button>
               <button style={{ "--i": 1 }} className="big" disabled={!plan && max === null} onClick={() => setScreen("train")}>Daily training</button>
-              <button style={{ "--i": 2 }} className="big" onClick={() => setScreen("plan")}>Training plan</button>
               <button style={{ "--i": 3 }} className="big" onClick={() => setScreen("adhoc")}>Ad-hoc</button>
             </div>
             {!plan && max === null && <p className="muted">Set a training plan or do an assessment to unlock daily training.</p>}

@@ -22,7 +22,7 @@ spec:
       containers:
         - name: nginx
           # The build-image pipeline fills in the @sha256 digest after the first push.
-          image: ghcr.io/xtemplate24/app3-frontend@sha256:8cf999c6a56573c57c285f228571676a42d571e86f16faa1ec1d6ad3fa39a6ed
+          image: ghcr.io/xtemplate24/app3-frontend@sha256:d817a556a32a87a4097d216085c12d003ed7a9d846e74cf237b052633e0083bd
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

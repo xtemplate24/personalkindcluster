@@ -433,14 +433,6 @@ function Stats({ sessions, custom, onDelete }) {
         <div className="card"><b>{avgEffort}</b><span>avg effort</span></div>
       </div>
 
-      <h2>By exercise</h2>
-      {rows.map((r) => (
-        <div key={r.n} className="hbar">
-          <div className="hbar-label"><span>{r.n}</span><span>max {r.max ?? "–"} · total {r.total}</span></div>
-          <div className="track"><div className="fill" style={{ width: `${(r.total / tmax) * 100}%`, background: colorOf(r.n) }} /></div>
-        </div>
-      ))}
-
       <h2>Last 14 days</h2>
       <div className="chips">
         {["All", ...names].map((n) => (
@@ -453,6 +445,16 @@ function Stats({ sessions, custom, onDelete }) {
         names={filter === "All" ? names : [filter]}
         colorOf={colorOf}
       />
+
+      <h2>By exercise</h2>
+      {rows.map((r) => (
+        <div key={r.n} className="hbar">
+          <div className="hbar-label"><span>{r.n}</span><span>max {r.max ?? "–"} · total {r.total}</span></div>
+          <div className="track"><div className="fill" style={{ width: `${(r.total / tmax) * 100}%`, background: colorOf(r.n) }} /></div>
+        </div>
+      ))}
+
+
 
       <DeleteAll onDelete={onDelete} />
     </section>
@@ -493,11 +495,11 @@ function Chart({ sessions, names, colorOf }) {
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
             <line className="grid-line" x1={L} x2={W - R} y1={yReps(top * f)} y2={yReps(top * f)} />
-            <text className="axis" x={L - 6} y={yReps(top * f) + 3} textAnchor="end">{Math.round(top * f)}</text>
+            <text className="axis" x={W - R + 6} y={yReps(top * f) + 3} textAnchor="start">{Math.round(top * f)}</text>
           </g>
         ))}
         {[1, 2, 3, 4, 5].map((e) => (
-          <text key={e} className="axis eff" x={W - R + 6} y={yEff(e) + 3}>{e}</text>
+          <text key={e} className="axis eff" x={L - 6} y={yEff(e) + 3} textAnchor="end">{e}</text>
         ))}
 
         {days.map((d, i) => {
@@ -532,7 +534,7 @@ function Chart({ sessions, names, colorOf }) {
         {names.map((n) => (
           <span key={n}><i style={{ background: colorOf(n) }} />{n}</span>
         ))}
-        <span><i className="swatch-line" />Avg effort (right axis, 1–5)</span>
+        <span><i className="swatch-line" />Avg effort (left axis, 1–5)</span>
       </div>
     </div>
   );

@@ -32,12 +32,51 @@ const recommend = (max, x) => {
 };
 
 // Browsers only allow sound after a tap, so unlockAudio() is called from button clicks.
-let audioCtx;
+let audioCtx = null;
+let reverbNode = null;
+
+// Pre-create the reverb space assets so they are ready instantly
+function initReverbEngine(ctx) {
+  if (reverbNode) return reverbNode;
+  
+  const sampleRate = ctx.sampleRate;
+  const reverbLength = sampleRate * 3.5;
+  const impulseBuffer = ctx.createBuffer(2, reverbLength, sampleRate);
+  
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulseBuffer.getChannelData(channel);
+    for (let i = 0; i < reverbLength; i++) {
+      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+    }
+  }
+  
+  const convolver = ctx.createConvolver();
+  convolver.buffer = impulseBuffer;
+  convolver.connect(ctx.destination);
+  reverbNode = convolver;
+  return reverbNode;
+}
+
 function unlockAudio() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
-  } catch {}
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    
+    // Initialize the reverb setup immediately on user tap asset priming
+    initReverbEngine(audioCtx);
+
+    // Mobile silence injection to wake up hardware channels
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(0);
+    osc.stop(0.01);
+  } catch (e) {
+    console.error("Audio unlock failed", e);
+  }
 }
 function chime() {
   navigator.vibrate?.(200);

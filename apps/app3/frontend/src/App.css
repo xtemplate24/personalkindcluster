@@ -1,3 +1,4 @@
+:root { --btn-radius: 20px; }
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
 body {
@@ -30,7 +31,7 @@ h2 { font-size: 1.05rem; margin: 30px 0 10px; color: #b7c3c5; }
 
 /* ---------- nav ---------- */
 .nav { display: flex; gap: 8px; }
-.tab { flex: 1; background: none; color: #7e9296; border: 0; border-bottom: 2px solid #223133; border-radius: 0; padding: 10px; font-size: 1rem; transition: color 0.2s, border-color 0.2s; }
+.tab { flex: 1; background: none; color: #7e9296; border: 0; border-bottom: 2px solid #223133; border-radius: var(--btn-radius); padding: 10px; font-size: 1rem; transition: color 0.2s, border-color 0.2s; }
 .tab:hover { color: #e8ecea; transform: none; }
 .tab.on { color: #f2a65a; border-color: #f2a65a; }
 
@@ -42,7 +43,7 @@ label { display: block; margin-top: 16px; color: #b7c3c5; font-size: 0.9rem; }
 
 button, input { font-family: inherit; }
 button {
-  font-size: 1rem; padding: 10px 16px; border-radius: 8px;
+  font-size: 1rem; padding: 10px 16px; border-radius: var(--btn-radius);
   border: 1px solid #223133; background: #131f21; color: #e8ecea; cursor: pointer;
   transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s, background 0.2s, opacity 0.2s;
 }
@@ -97,7 +98,7 @@ input:focus { outline: none; border-color: #f2a65a; box-shadow: 0 0 0 3px #f2a65
 .fill { height: 100%; border-radius: 4px; transform-origin: left; animation: grow-x 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { padding: 6px 12px; font-size: 0.85rem; border-radius: 999px; }
+.chip { padding: 6px 12px; font-size: 0.85rem; border-radius: var(--btn-radius); }
 .chip.on { background: #f2a65a; color: #101a1c; border-color: #f2a65a; }
 
 .chart { margin-top: 12px; background: #0f191b; border: 1px solid #223133; border-radius: 10px; padding: 10px; }

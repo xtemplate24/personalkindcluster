@@ -231,7 +231,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 button.big {
   padding: 24px 10px;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-family: "Space Grotesk", sans-serif;
   flex: 1;
   border-radius: var(--tile-radius);

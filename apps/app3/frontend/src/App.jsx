@@ -40,21 +40,79 @@ function unlockAudio() {
   } catch {}
 }
 function chime() {
+  // 1. Initialize AudioContext on the first user interaction if it doesn't exist
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  
+  // 2. Resume if suspended (browsers often suspend audio contexts to save power)
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
+  // 3. Fallback check for standard mobile/device vibration API
   navigator.vibrate?.(200);
-  if (!audioCtx) return;
+
   const now = audioCtx.currentTime;
-  [659.25, 783.99, 1046.5].forEach((freq, k) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    const t = now + k * 0.18;
-    osc.type = "sine";
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 1.3);
+
+  // --- STEP A: CREATE THE DYNAMIC REVERB SPACE ---
+  const sampleRate = audioCtx.sampleRate;
+  const reverbLength = sampleRate * 3.5; // 3.5 seconds of trailing echo
+  const impulseBuffer = audioCtx.createBuffer(2, reverbLength, sampleRate);
+  
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulseBuffer.getChannelData(channel);
+    for (let i = 0; i < reverbLength; i++) {
+      // Exponentially decaying noise creates a premium acoustic space
+      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+    }
+  }
+  const convolver = audioCtx.createConvolver();
+  convolver.buffer = impulseBuffer;
+  convolver.connect(audioCtx.destination);
+
+  // --- STEP B: THE DEEP, CINEMATIC MAC-STYLE CHORD ---
+  // Deep low-end fundamental frequencies (Db2, Ab2, Db3, F3, Ab3)
+  const lowFrequencies = [69.30, 103.83, 138.59, 174.61, 207.65];
+
+  lowFrequencies.forEach((fundamental, k) => {
+    // Soft, organic rolling entry for each note to create a cinematic swell
+    const noteStartTime = now + k * 0.05;
+
+    // Harmonic multipliers to add a premium metallic/glass shimmer over the bass
+    const harmonics =[1, 2, 3];
+
+    harmonics.forEach((harmonicMultiplier, hIndex) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      // Add slight detuning to create a lush, expensive "chorus" texture
+      osc.detune.value = (Math.random() * 2 - 1) * 8; 
+      
+      // Use triangle waves for the base notes to keep them warm, sine waves for high overtones
+      osc.type = hIndex === 0 ? "triangle" : "sine"; 
+      osc.frequency.value = fundamental * harmonicMultiplier;
+
+      // Balance volumes: heavy sub-bass foundation, subtle crystalline overtones
+      const volReduction = hIndex === 0 ? 0.35 : 0.12 / harmonicMultiplier;
+
+      // Sleek audio envelope: subtle swell attack (0.08s) followed by a long, slow decay
+      gainNode.gain.setValueAtTime(0.0001, noteStartTime);
+      gainNode.gain.linearRampToValueAtTime(volReduction, noteStartTime + 0.08);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStartTime + 2.5);
+
+      // Route 1: Send to the reverb engine for massive scale
+      osc.connect(gainNode).connect(convolver);
+      
+      // Route 2: Send a quiet direct "dry" line so the note definitions stay crisp
+      const dryGain = audioCtx.createGain();
+      dryGain.gain.value = 0.15;
+      gainNode.connect(dryGain).connect(audioCtx.destination);
+
+      // Start and cleanly garbage-collect the oscillators
+      osc.start(noteStartTime);
+      osc.stop(noteStartTime + 3.0);
+    });
   });
 }
 

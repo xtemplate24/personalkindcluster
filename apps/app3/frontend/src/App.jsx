@@ -40,21 +40,56 @@ function unlockAudio() {
   } catch {}
 }
 function chime() {
-  navigator.vibrate?.(200);
-  if (!audioCtx) return;
-  const now = audioCtx.currentTime;
-  [659.25, 783.99, 1046.5].forEach((freq, k) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    const t = now + k * 0.18;
-    osc.type = "sine";
-    osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(t);
-    osc.stop(t + 1.3);
+// --- STEP A: CREATE THE DYNAMIC REVERB SPACE ---
+  const sampleRate = audioCtx.sampleRate;
+  const reverbLength = sampleRate * 3.5;
+  const impulseBuffer = audioCtx.createBuffer(2, reverbLength, sampleRate);
+  
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulseBuffer.getChannelData(channel);
+    for (let i = 0; i < reverbLength; i++) {
+      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+    }
+  }
+  const convolver = audioCtx.createConvolver();
+  convolver.buffer = impulseBuffer;
+  convolver.connect(audioCtx.destination);
+
+  // --- STEP B: THE DEEP, CINEMATIC MAC-STYLE CHORD ---
+  const lowFrequencies = Array.of(69.30, 103.83, 138.59, 174.61, 207.65);
+
+  lowFrequencies.forEach((fundamental, k) => {
+    const noteStartTime = now + k * 0.05;
+
+    // Written as explicitly defined variables so formatting cannot delete it!
+    const h1 = 1.0;
+    const h2 = 2.0;
+    const h3 = 3.0;
+    const harmonics = Array.of(h1, h2, h3);
+
+    harmonics.forEach((harmonicMultiplier, hIndex) => {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      
+      osc.detune.value = (Math.random() * 2 - 1) * 8; 
+      osc.type = hIndex === 0 ? "triangle" : "sine"; 
+      osc.frequency.value = fundamental * harmonicMultiplier;
+
+      const volReduction = hIndex === 0 ? 0.35 : 0.12 / harmonicMultiplier;
+
+      gainNode.gain.setValueAtTime(0.0001, noteStartTime);
+      gainNode.gain.linearRampToValueAtTime(volReduction, noteStartTime + 0.08);
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStartTime + 2.5);
+
+      osc.connect(gainNode).connect(convolver);
+      
+      const dryGain = audioCtx.createGain();
+      dryGain.gain.value = 0.15;
+      gainNode.connect(dryGain).connect(audioCtx.destination);
+
+      osc.start(noteStartTime);
+      osc.stop(noteStartTime + 3.0);
+    });
   });
 }
 

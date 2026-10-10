@@ -129,7 +129,7 @@ export default function App() {
 
         {screen === "mode" && (
           <section>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" ,marginTop: "0.5rem"}}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" ,marginTop: "2rem"}}>
               <h1 style={{ margin: 0 }}>{exercise}</h1>
               <button 
                 className="secondary-btn" /* Feel free to swap with an existing small button class */
@@ -422,7 +422,8 @@ function Stats({ sessions, custom, onDelete }) {
   if (!sessions.length && !custom.length)
     return <section><h1>My stats</h1><p className="muted">Nothing logged yet.</p></section>;
 
-  const total = sessions.reduce((a, s) => a + s.reps, 0);
+  // A Set only keeps unique values, so each calendar day is counted once
+  const daysActive = new Set(sessions.map((s) => dayKey(s.ts))).size;
   const efforts = sessions.filter((s) => s.effort);
   const avgEffort = efforts.length ? (efforts.reduce((a, s) => a + s.effort, 0) / efforts.length).toFixed(1) : "–";
   const rows = names.map((n) => ({
@@ -436,7 +437,7 @@ function Stats({ sessions, custom, onDelete }) {
     <section>
       <h1>My stats</h1>
       <div className="cards">
-        <div className="card"><b>{total}</b><span>total reps</span></div>
+        <div className="card"><b>{daysActive}</b><span>days active</span></div>
         <div className="card"><b>{sessions.length}</b><span>sessions</span></div>
         <div className="card"><b>{avgEffort}</b><span>avg effort</span></div>
       </div>

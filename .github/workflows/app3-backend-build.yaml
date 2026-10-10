@@ -21,4 +21,4 @@ jobs:
     with:
       name: app3-backend
       context: apps/app3/backend
-      manifest: app-deployments/app3/backend-deployment.yaml
+      manifest: app-deployments/app3/backend/deployment.yaml

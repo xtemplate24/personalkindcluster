@@ -21,4 +21,4 @@ jobs:
     with:
       name: app3-frontend
       context: apps/app3/frontend
-      manifest: app-deployments/app3/frontend-deployment.yaml
+      manifest: app-deployments/app3/frontend/deployment.yaml

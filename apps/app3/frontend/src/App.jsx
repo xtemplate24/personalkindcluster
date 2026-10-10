@@ -40,23 +40,10 @@ function unlockAudio() {
   } catch {}
 }
 function chime() {
-  // 1. Initialize AudioContext on the first user interaction if it doesn't exist
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  
-  // 2. Resume if suspended (browsers often suspend audio contexts to save power)
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-
-  // 3. Fallback check for standard mobile/device vibration API
   navigator.vibrate?.(200);
-
+  if (!audioCtx) return;
   const now = audioCtx.currentTime;
-
-  // --- STEP A: CREATE THE DYNAMIC REVERB SPACE ---
-  const sampleRate = audioCtx.sampleRate;
+const sampleRate = audioCtx.sampleRate;
   const reverbLength = sampleRate * 3.5; // 3.5 seconds of trailing echo
   const impulseBuffer = audioCtx.createBuffer(2, reverbLength, sampleRate);
   

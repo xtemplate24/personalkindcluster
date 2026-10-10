@@ -35,7 +35,7 @@
   --aurora-2: 143, 168, 255;   /* blue 143, 168, 255 */
   --aurora-3: 181, 140, 240;   /* violet */
   --aurora-4: 224, 122, 159;   /* pink */
-  --aurora-5: 209, 93, 0;   /* teal 111, 214, 196*/
+  --aurora-5: 111, 214, 196;   /* teal 111, 214, 196*/
   --noise-opacity: 0.09;       /* 0 = no grain, 0.15 = very grainy */
 
   /* ---------- shapes ---------- */

@@ -16,7 +16,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        package: [hello-nginx, second-page, landing, app1-frontend, app1-backend, app2-llm, app2-ui]
+        package: [hello-nginx, second-page, landing, app1-frontend, app1-backend, app2-llm, app2-ui, app3-frontend, app3-backend]
     steps:
       - name: Delete old versions of ${{ matrix.package }}
         uses: actions/delete-package-versions@v5

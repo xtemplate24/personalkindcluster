@@ -1,11 +1,6 @@
 import http from "node:http";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DIST = path.join(__dirname, "dist");
 const PORT = process.env.PORT || 8080;
 
 // The database file lives on the PersistentVolume mounted at /data.
@@ -59,16 +54,6 @@ const readBody = (req) =>
     });
     req.on("end", () => { try { resolve(JSON.parse(data || "{}")); } catch (e) { reject(e); } });
   });
-
-const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
-function serveStatic(p, res) {
-  let file = path.join(DIST, path.normalize(p));
-  if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
-    file = path.join(DIST, "index.html");
-  }
-  res.writeHead(200, { "Content-Type": types[path.extname(file)] || "application/octet-stream" });
-  fs.createReadStream(file).pipe(res);
-}
 
 http
   .createServer(async (req, res) => {
@@ -127,13 +112,12 @@ http
           q.deletePlans.run(user);
           return json(res, 200, { ok: true });
         }
-        return json(res, 404, { error: "not found" });
       }
 
-      serveStatic(p, res);
+      json(res, 404, { error: "not found" });
     } catch (err) {
       console.error(err);
       json(res, 500, { error: "internal error" });
     }
   })
-  .listen(PORT, () => console.log(`app3 listening on ${PORT}`));
+  .listen(PORT, () => console.log(`app3-backend listening on ${PORT}`));

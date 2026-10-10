@@ -1,0 +1,12 @@
+# Disk space that survives pod restarts. kind's built-in "standard"
+# storage class creates the underlying volume automatically.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app3-data
+  namespace: app3
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

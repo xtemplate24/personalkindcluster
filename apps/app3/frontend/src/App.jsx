@@ -82,32 +82,18 @@ function chime() {
   navigator.vibrate?.(200);
   if (!audioCtx) return;
   const now = audioCtx.currentTime;
-  // --- STEP A: CREATE THE DYNAMIC REVERB SPACE ---
-  const sampleRate = audioCtx.sampleRate;
-  const reverbLength = sampleRate * 3.5;
-  const impulseBuffer = audioCtx.createBuffer(2, reverbLength, sampleRate);
-  
-  for (let channel = 0; channel < 2; channel++) {
-    const channelData = impulseBuffer.getChannelData(channel);
-    for (let i = 0; i < reverbLength; i++) {
-      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
-    }
-  }
-  const convolver = audioCtx.createConvolver();
-  convolver.buffer = impulseBuffer;
-  convolver.connect(audioCtx.destination);
 
-  // --- STEP B: THE DEEP, CINEMATIC MAC-STYLE CHORD ---
+  // Make sure the reverb engine is established safely
+  const convolver = initReverbEngine(audioCtx);
+
+  // Deep cinematic notes (Db2, Ab2, Db3, F3, Ab3)
   const lowFrequencies = Array.of(69.30, 103.83, 138.59, 174.61, 207.65);
 
   lowFrequencies.forEach((fundamental, k) => {
     const noteStartTime = now + k * 0.05;
 
-    // Written as explicitly defined variables so formatting cannot delete it!
-    const h1 = 1.0;
-    const h2 = 2.0;
-    const h3 = 3.0;
-    const harmonics = Array.of(h1, h2, h3);
+    // Fixed array values to prevent code drops
+    const harmonics = Array.of(1, 2, 3);
 
     harmonics.forEach((harmonicMultiplier, hIndex) => {
       const osc = audioCtx.createOscillator();
@@ -123,6 +109,7 @@ function chime() {
       gainNode.gain.linearRampToValueAtTime(volReduction, noteStartTime + 0.08);
       gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStartTime + 2.5);
 
+      // Route through our pre-warmed reverb node
       osc.connect(gainNode).connect(convolver);
       
       const dryGain = audioCtx.createGain();

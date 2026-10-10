@@ -309,7 +309,7 @@ input:focus { outline: none; border-color: var(--accent); box-shadow: inset 0 2p
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 8; }
 .ring-bg { stroke: rgba(var(--white-rgb), 0.12); }
-.ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.6)); }
+.ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 2px rgba(var(--accent-rgb), 0.6)); }
 .ring-time { position: absolute; inset: 0; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 2.8rem; font-variant-numeric: tabular-nums; }
 
 /* ---------- stats ---------- */

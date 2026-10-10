@@ -35,7 +35,7 @@ const recommend = (max, x) => {
 // Keep context global so it lives across component re-renders
 let audioCtx = null;
 let globalReverb = null;
-const PITCH = 4;
+const PITCH = 2;
 
 // Pre-render a tiny single-channel impulse response buffer immediately on start.
 // This takes 0ms computational overhead during the chime event.

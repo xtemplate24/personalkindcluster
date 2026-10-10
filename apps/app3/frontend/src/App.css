@@ -34,7 +34,7 @@ html, body, #root { min-height: 100%; margin: 0; }
 html { background: var(--bg); }
 
 body {
-  background: var(--bg);
+  min-height: 100vh;
   color: var(--text);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -52,8 +52,8 @@ body::before {
     radial-gradient(35% 35% at 80% 20%, rgba(111,214,196,0.28), transparent 70%),
     radial-gradient(45% 45% at 60% 80%, rgba(143,168,255,0.28), transparent 70%),
     radial-gradient(30% 30% at 10% 85%, rgba(224,122,159,0.22), transparent 70%);
-  filter: blur(40px);
-  animation: drift 24s ease-in-out infinite alternate;
+  filter: blur(24px);
+  animation: drift 12s ease-in-out infinite alternate;
   pointer-events: none;
 }
 

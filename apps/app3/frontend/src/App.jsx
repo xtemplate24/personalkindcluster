@@ -232,7 +232,7 @@ function PlanEditor({ exercise, plan, max, onSave, onBack }) {
 
       <button className="primary huge" disabled={!valid || busy} onClick={submit}>Save plan</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn" onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -271,7 +271,7 @@ function Assessment({ exercise, onSave, onBack }) {
         </>
       )}
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn" onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -374,7 +374,7 @@ function Training({ exercise, max, plan: saved, onSave, onBack }) {
         </>
       )}
       {err && <p className="error">{err}</p>}
-      {phase !== "effort" && <button className="secondary-btn" onClick={onBack}>Quit (this session is not saved)</button>}
+      {phase !== "effort" && <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Quit (this session is not saved)</button>}
     </section>
   );
 }
@@ -407,7 +407,7 @@ function AdHoc({ exercise, onSave, onBack }) {
       </div>
       <button className="primary huge" disabled={!(n > 0) || !effort || busy} onClick={submit}>Save</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn" onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -577,7 +577,7 @@ function DeleteAll({ onDelete }) {
             </button>
           </div>
           {err && <p className="error">{err}</p>}
-          <button className="secondary-btn" onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
+          <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
         </div>
       )}
     </div>

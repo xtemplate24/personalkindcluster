@@ -35,6 +35,7 @@ const recommend = (max, x) => {
 // Keep context global so it lives across component re-renders
 let audioCtx = null;
 let globalReverb = null;
+const PITCH = 4;
 
 // Pre-render a tiny single-channel impulse response buffer immediately on start.
 // This takes 0ms computational overhead during the chime event.
@@ -122,10 +123,10 @@ function chime() {
         
         // Triangle wave provides a warm, clean sub-bass layer; sines manage clear overtones
         osc.type = hIndex === 0 ? "triangle" : "sine"; 
-        osc.frequency.value = fundamental * harmonicMultiplier;
+        osc.frequency.value = fundamental * harmonicMultiplier * PITCH;
 
         // Dynamic volume scaling to protect small mobile device speakers from clipping distortion
-        const volReduction = hIndex === 0 ? 0.22 : 0.08 / harmonicMultiplier;
+        const volReduction = hIndex === 0 ? 0.3 : 0.1 / harmonicMultiplier;
 
         // Mobile-optimized envelope curve: snappy swell attack followed by graceful fade-out
         gainNode.gain.setValueAtTime(0.0001, noteStartTime);
@@ -139,7 +140,7 @@ function chime() {
         
         // Path 2: Direct dry pipeline fallback configuration for clarity
         const dryGain = audioCtx.createGain();
-        dryGain.gain.setValueAtTime(0.08, now);
+        dryGain.gain.setValueAtTime(0.5, now);
         gainNode.connect(dryGain).connect(audioCtx.destination);
 
         // Execute node runtime bounds and register automatic garbage collection

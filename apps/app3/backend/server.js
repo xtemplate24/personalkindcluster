@@ -38,6 +38,9 @@ const q = {
   deleteSessions: db.prepare("DELETE FROM sessions WHERE user = ?"),
   deleteCustoms: db.prepare("DELETE FROM custom_exercises WHERE user = ?"),
   deletePlans: db.prepare("DELETE FROM plans WHERE user = ?"),
+  deleteSessionsFor: db.prepare("DELETE FROM sessions WHERE user = ? AND exercise = ?"),
+  deleteCustomFor: db.prepare("DELETE FROM custom_exercises WHERE user = ? AND name = ?"),
+  deletePlanFor: db.prepare("DELETE FROM plans WHERE user = ? AND exercise = ?"),
 };
 
 const json = (res, code, body) => {
@@ -110,6 +113,14 @@ http
           q.deleteSessions.run(user);
           q.deleteCustoms.run(user);
           q.deletePlans.run(user);
+          return json(res, 200, { ok: true });
+        }
+        if (req.method === "DELETE" && p === "/api/exercise") {
+          const exercise = String((await readBody(req)).exercise || "").trim();
+          if (!exercise || exercise.length > 30) return json(res, 400, { error: "bad exercise" });
+          q.deleteSessionsFor.run(user, exercise);
+          q.deletePlanFor.run(user, exercise);
+          q.deleteCustomFor.run(user, exercise);
           return json(res, 200, { ok: true });
         }
       }

@@ -192,6 +192,13 @@ export default function App() {
     await refresh();
   };
 
+  const deleteExercise = async () => {
+    await call("/exercise", { method: "DELETE", body: { exercise } });
+    await refresh();
+    setExercise(null);
+    setScreen("home");
+  };
+
   if (error) return <div className="page"><p className="error">{error} — try reloading.</p></div>;
   if (!data) return <div className="page"><div className="spinner" /></div>;
 
@@ -251,7 +258,7 @@ export default function App() {
         {screen === "assess" && <Assessment exercise={exercise} onSave={save} onBack={() => setScreen("mode")} />}
         {screen === "train" && <Training exercise={exercise} max={max} plan={plan} onSave={save} onBack={() => setScreen("mode")} />}
         {screen === "adhoc" && <AdHoc exercise={exercise} onSave={save} onBack={() => setScreen("mode")} />}
-        {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onBack={() => setScreen("mode")} />}
+        {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onDeleteExercise={deleteExercise} onBack={() => setScreen("mode")} />}
         {screen === "stats" && <Stats sessions={data.sessions} custom={data.custom} onDelete={deleteAll} />}
       </div>
     </div>
@@ -268,7 +275,7 @@ function Stepper({ value, onChange, min, max, step = 1, display }) {
   );
 }
 
-function PlanEditor({ exercise, plan, max, onSave, onBack }) {
+function PlanEditor({ exercise, plan, max, onSave, onBack, onDeleteExercise  }) {
   const [sets, setSets] = useState(plan?.sets ?? 3);
   const [reps, setReps] = useState(() => {
     const r = (plan?.reps ?? []).map(String);
@@ -328,6 +335,7 @@ function PlanEditor({ exercise, plan, max, onSave, onBack }) {
       <button className="primary huge" disabled={!valid || busy} onClick={submit}>Save plan</button>
       {err && <p className="error">{err}</p>}
       <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
+      <DeleteExercise exercise={exercise} onDelete={onDeleteExercise} />
     </section>
   );
 }
@@ -673,6 +681,40 @@ function DeleteAll({ onDelete }) {
           </div>
           {err && <p className="error">{err}</p>}
           <button className="secondary-btn"  style={{ marginTop: 20}} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeleteExercise({ exercise, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const go = async () => {
+    setBusy(true);
+    try { await onDelete(); }
+    catch (e) { setErr(e.message); setBusy(false); }
+  };
+
+  return (
+    <div className="danger">
+      {!open ? (
+        <button className="danger-btn" onClick={() => setOpen(true)}>Delete exercise</button>
+      ) : (
+        <div className="danger-box">
+          <p>This permanently deletes every session, max, training plan, and ad-hoc log for "{exercise}". It can't be undone.</p>
+          <label>Type DELETE to confirm</label>
+          <div className="row">
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder="DELETE" />
+            <button className="danger-btn solid" disabled={text !== "DELETE" || busy} onClick={go}>
+              {busy ? "Deleting…" : "Delete forever"}
+            </button>
+          </div>
+          {err && <p className="error">{err}</p>}
+          <button className="secondary-btn" style={{ marginTop: 10 }} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
         </div>
       )}
     </div>

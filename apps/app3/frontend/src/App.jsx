@@ -129,7 +129,7 @@ export default function App() {
 
         {screen === "mode" && (
           <section>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" ,marginTop: "0.5rem"}}>
               <h1 style={{ margin: 0 }}>{exercise}</h1>
               <button 
                 className="secondary-btn" /* Feel free to swap with an existing small button class */

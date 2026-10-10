@@ -1,18 +1,18 @@
-name: app3-frontend-build
+# name: app3-frontend-build
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/app3/frontend/**"
-      - ".github/workflows/app3-frontend.yaml"
-      - ".github/workflows/build-image.yaml"
-  workflow_dispatch:
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - "apps/app3/frontend/**"
+#       - ".github/workflows/app3-frontend.yaml"
+#       - ".github/workflows/build-image.yaml"
+#   workflow_dispatch:
 
-permissions:
-  contents: read
+# permissions:
+#   contents: read
 
-# jobs:
+# # jobs:
 #   image:
 #     permissions:
 #       contents: write

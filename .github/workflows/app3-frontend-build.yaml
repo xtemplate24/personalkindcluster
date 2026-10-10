@@ -12,13 +12,13 @@ on:
 permissions:
   contents: read
 
-jobs:
-  image:
-    permissions:
-      contents: write
-      packages: write
-    uses: ./.github/workflows/build-image.yaml
-    with:
-      name: app3-frontend
-      context: apps/app3/frontend
-      manifest: app-deployments/app3/frontend/deployment.yaml
+# jobs:
+#   image:
+#     permissions:
+#       contents: write
+#       packages: write
+#     uses: ./.github/workflows/build-image.yaml
+#     with:
+#       name: app3-frontend
+#       context: apps/app3/frontend
+#       manifest: app-deployments/app3/frontend/deployment.yaml

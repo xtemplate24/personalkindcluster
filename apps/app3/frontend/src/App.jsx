@@ -32,95 +32,126 @@ const recommend = (max, x) => {
 };
 
 // Browsers only allow sound after a tap, so unlockAudio() is called from button clicks.
+// Keep context global so it lives across component re-renders
 let audioCtx = null;
-let reverbNode = null;
+let globalReverb = null;
 
-// Pre-create the reverb space assets so they are ready instantly
-function initReverbEngine(ctx) {
-  if (reverbNode) return reverbNode;
-  
-  const sampleRate = ctx.sampleRate;
-  const reverbLength = sampleRate * 3.5;
-  const impulseBuffer = ctx.createBuffer(2, reverbLength, sampleRate);
-  
-  for (let channel = 0; channel < 2; channel++) {
-    const channelData = impulseBuffer.getChannelData(channel);
-    for (let i = 0; i < reverbLength; i++) {
-      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / reverbLength, 2.5);
+// Pre-render a tiny single-channel impulse response buffer immediately on start.
+// This takes 0ms computational overhead during the chime event.
+function getReverbNode(ctx) {
+  if (globalReverb) return globalReverb;
+  try {
+    const rate = ctx.sampleRate || 44100;
+    const len = rate * 2.5; // Optimized to 2.5s for faster mobile memory initialization
+    const buf = ctx.createBuffer(1, len, rate); // Single channel (mono) is vastly safer on Android
+    const data = buf.getChannelData(0);
+    
+    for (let i = 0; i < len; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.0);
     }
+    
+    const convolver = ctx.createConvolver();
+    convolver.buffer = buf;
+    convolver.connect(ctx.destination);
+    globalReverb = convolver;
+    return globalReverb;
+  } catch (e) {
+    console.error("Failed to build reverb graph", e);
+    return null;
   }
-  
-  const convolver = ctx.createConvolver();
-  convolver.buffer = impulseBuffer;
-  convolver.connect(ctx.destination);
-  reverbNode = convolver;
-  return reverbNode;
 }
 
 function unlockAudio() {
   try {
+    // Standard cross-browser AudioContext fallback assignment
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    
     if (audioCtx.state === "suspended") {
       audioCtx.resume();
     }
-    
-    // Initialize the reverb setup immediately on user tap asset priming
-    initReverbEngine(audioCtx);
 
-    // Mobile silence injection to wake up hardware channels
+    // CRITICAL ANDROID FIX: Warm up the reverb engine immediately on the tap event thread.
+    const reverb = getReverbNode(audioCtx);
+
+    // Play a synchronous, short burst of absolute silence.
+    // This primes the hardware mixer stream before the DOM switches screens.
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     gain.gain.setValueAtTime(0, audioCtx.currentTime);
     osc.connect(gain).connect(audioCtx.destination);
     osc.start(0);
-    osc.stop(0.01);
+    osc.stop(0.02);
   } catch (e) {
-    console.error("Audio unlock failed", e);
+    console.error("Audio hardware wake failure:", e);
   }
 }
+
 function chime() {
-  navigator.vibrate?.(200);
+  // Safe hardware vibration check
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    navigator.vibrate(200);
+  }
+
   if (!audioCtx) return;
+
+  // Final check to make sure Android hasn't suspended the pipeline in the background
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+
   const now = audioCtx.currentTime;
+  const convolver = getReverbNode(audioCtx);
 
-  // Make sure the reverb engine is established safely
-  const convolver = initReverbEngine(audioCtx);
-
-  // Deep cinematic notes (Db2, Ab2, Db3, F3, Ab3)
+  // Balanced cinematic low-frequency arrangement (Db2, Ab2, Db3, F3, Ab3)
   const lowFrequencies = Array.of(69.30, 103.83, 138.59, 174.61, 207.65);
 
   lowFrequencies.forEach((fundamental, k) => {
-    const noteStartTime = now + k * 0.05;
-
-    // Fixed array values to prevent code drops
+    // Subtle, organic staggered entry for a premium cinematic swell feel
+    const noteStartTime = now + k * 0.04;
+    
+    // Explicit clean harmonics to maintain standard string matrix tracking on mobile
     const harmonics = Array.of(1, 2, 3);
 
     harmonics.forEach((harmonicMultiplier, hIndex) => {
-      const osc = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      osc.detune.value = (Math.random() * 2 - 1) * 8; 
-      osc.type = hIndex === 0 ? "triangle" : "sine"; 
-      osc.frequency.value = fundamental * harmonicMultiplier;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        // Add random pitch detuning to mimic luxurious, premium analog chorus textures
+        osc.detune.value = (Math.random() * 2 - 1) * 6; 
+        
+        // Triangle wave provides a warm, clean sub-bass layer; sines manage clear overtones
+        osc.type = hIndex === 0 ? "triangle" : "sine"; 
+        osc.frequency.value = fundamental * harmonicMultiplier;
 
-      const volReduction = hIndex === 0 ? 0.35 : 0.12 / harmonicMultiplier;
+        // Dynamic volume scaling to protect small mobile device speakers from clipping distortion
+        const volReduction = hIndex === 0 ? 0.22 : 0.08 / harmonicMultiplier;
 
-      gainNode.gain.setValueAtTime(0.0001, noteStartTime);
-      gainNode.gain.linearRampToValueAtTime(volReduction, noteStartTime + 0.08);
-      gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStartTime + 2.5);
+        // Mobile-optimized envelope curve: snappy swell attack followed by graceful fade-out
+        gainNode.gain.setValueAtTime(0.0001, noteStartTime);
+        gainNode.gain.linearRampToValueAtTime(volReduction, noteStartTime + 0.06);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, noteStartTime + 2.0);
 
-      // Route through our pre-warmed reverb node
-      osc.connect(gainNode).connect(convolver);
-      
-      const dryGain = audioCtx.createGain();
-      dryGain.gain.value = 0.15;
-      gainNode.connect(dryGain).connect(audioCtx.destination);
+        // Path 1: Feed audio through the pre-instantiated reverb convolver
+        if (convolver) {
+          osc.connect(gainNode).connect(convolver);
+        }
+        
+        // Path 2: Direct dry pipeline fallback configuration for clarity
+        const dryGain = audioCtx.createGain();
+        dryGain.gain.setValueAtTime(0.08, now);
+        gainNode.connect(dryGain).connect(audioCtx.destination);
 
-      osc.start(noteStartTime);
-      osc.stop(noteStartTime + 3.0);
+        // Execute node runtime bounds and register automatic garbage collection
+        osc.start(noteStartTime);
+        osc.stop(noteStartTime + 2.2);
+      } catch (err) {
+        console.error("Oscillator initialization error:", err);
+      }
     });
   });
 }
+
 
 export default function App() {
   const [data, setData] = useState(null);
@@ -296,7 +327,7 @@ function PlanEditor({ exercise, plan, max, onSave, onBack }) {
 
       <button className="primary huge" disabled={!valid || busy} onClick={submit}>Save plan</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -335,7 +366,7 @@ function Assessment({ exercise, onSave, onBack }) {
         </>
       )}
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -438,7 +469,7 @@ function Training({ exercise, max, plan: saved, onSave, onBack }) {
         </>
       )}
       {err && <p className="error">{err}</p>}
-      {phase !== "effort" && <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Quit (this session is not saved)</button>}
+      {phase !== "effort" && <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Quit (this session is not saved)</button>}
     </section>
   );
 }
@@ -471,7 +502,7 @@ function AdHoc({ exercise, onSave, onBack }) {
       </div>
       <button className="primary huge" disabled={!(n > 0) || !effort || busy} onClick={submit}>Save</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={onBack}>Back</button>
+      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
     </section>
   );
 }
@@ -641,7 +672,7 @@ function DeleteAll({ onDelete }) {
             </button>
           </div>
           {err && <p className="error">{err}</p>}
-          <button className="secondary-btn"  style={{ marginTop: 10 }} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
+          <button className="secondary-btn"  style={{ marginTop: 20}} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
         </div>
       )}
     </div>

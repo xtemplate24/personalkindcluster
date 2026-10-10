@@ -4,7 +4,7 @@ const API = `${import.meta.env.BASE_URL}api`;
 const DEFAULTS = ["Push ups", "Pull ups", "Crunches", "Squats"];
 const DEFAULT_REST = 60;
 const MAX_SETS = 5;
-const COLORS = ["#f2a65a", "#6fd6c4", "#8fa8ff", "#e07a9f", "#c9d36a", "#b58cf0", "#f08a5d", "#5fc2e8"];
+const COLORS = ["#67e8f9", "#6fd6c4", "#8fa8ff", "#e07a9f", "#c9d36a", "#b58cf0", "#f08a5d", "#5fc2e8"];
 
 async function call(path, { method, body } = {}) {
   const res = await fetch(`${API}${path}`, {

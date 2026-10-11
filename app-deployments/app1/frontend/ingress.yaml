@@ -8,18 +8,17 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.middlewares: >-
       auth-oauth2-proxy-errors@kubernetescrd,
-      auth-oauth2-proxy-auth@kubernetescrd,
-      app1-strip-app1@kubernetescrd
+      auth-oauth2-proxy-auth@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - xtemplate.cc
+        - app1.xtemplate.cc
   rules:
-    - host: xtemplate.cc
+    - host: app1.xtemplate.cc
       http:
         paths:
-          - path: /app1
+          - path: /
             pathType: Prefix
             backend:
               service:

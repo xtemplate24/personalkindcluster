@@ -2,9 +2,9 @@ import "./App.css";
 import { useEffect, useState } from "react";
 
 const apps = [
-  { name: "One - Currency Converter", path: "/app1" },
-  { name: "Two - Local LLM", path: "/app2" },
-  { name: "Three - Workout tracker", path: "/app3" }
+  { name: "One - Currency Converter", url: "https://app1.xtemplate.cc", label: "app1.xtemplate.cc" },
+  { name: "Two - Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
+  { name: "Three - Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
 ];
 
 export default function App() {
@@ -31,9 +31,9 @@ export default function App() {
 
           <nav className="apps" aria-label="Applications">
             {apps.map((app) => (
-              <a key={app.path} href={app.path} className="app-link">
+              <a key={app.url} href={app.url} className="app-link">
                 <span>{app.name}</span>
-                <span className="app-path">{app.path}</span>
+                <span className="app-path">{app.label}</span>
               </a>
             ))}
           </nav>

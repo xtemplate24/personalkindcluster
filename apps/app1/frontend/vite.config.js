@@ -8,7 +8,7 @@ export default defineConfig({
   // so the browser requests /app1/assets/..., which matches the ingress rule;
   // Traefik's StripPrefix middleware then strips "/app1" before it reaches
   // the pod, where Express serves the same file at its root-relative path.
-  base: "/app1/",
+  base: "/",
   server: {
     proxy: {
       // Convenience for `npm run dev` outside the cluster: forwards API

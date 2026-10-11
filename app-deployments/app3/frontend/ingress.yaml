@@ -9,14 +9,13 @@ metadata:
     traefik.ingress.kubernetes.io/router.middlewares: >-
       auth-oauth2-proxy-errors@kubernetescrd,
       auth-oauth2-proxy-auth@kubernetescrd,
-      app3-strip-app3@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - xtemplate.cc
+        - app3.xtemplate.cc
   rules:
-    - host: xtemplate.cc
+    - host: app3.xtemplate.cc
       http:
         paths:
           - path: /app3/api

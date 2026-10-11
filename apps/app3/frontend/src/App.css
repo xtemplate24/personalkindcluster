@@ -57,7 +57,13 @@
 
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
-html { background: var(--bg); }
+html {
+  background:
+    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(90% 60% at 100% 100%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 70%),
+    var(--bg);
+  background-repeat: no-repeat;
+}
 
 body {
   min-height: 100vh;

@@ -8,7 +8,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.middlewares: >-
       auth-oauth2-proxy-errors@kubernetescrd,
-      auth-oauth2-proxy-auth@kubernetescrd,
+      auth-oauth2-proxy-auth@kubernetescrd
 spec:
   ingressClassName: traefik
   tls:

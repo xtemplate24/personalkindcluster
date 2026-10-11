@@ -18,14 +18,14 @@ spec:
     - host: app3.xtemplate.cc
       http:
         paths:
-          - path: /app3/api
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: app3-backend-svc
                 port:
                   name: api
-          - path: /app3
+          - path: /
             pathType: Prefix
             backend:
               service:

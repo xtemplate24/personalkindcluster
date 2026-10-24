@@ -4,8 +4,6 @@ metadata:
   name: landing
   namespace: landing-app
 spec:
-  imagePullSecrets:
-    - name: ghcr-pull
   replicas: 1
   selector:
     matchLabels:

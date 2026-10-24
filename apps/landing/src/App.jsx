@@ -2,9 +2,9 @@ import "./App.css";
 import { useEffect, useState } from "react";
 
 const apps = [
-  { name: "One - Currency Converter", url: "https://app1.xtemplate.cc", label: "app1.xtemplate.cc" },
-  { name: "Two - Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
-  { name: "Three - Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
+  { name: "Currency Converter", url: "https://app1.xtemplate.cc", label: "app1.xtemplate.cc" },
+  { name: "Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
+  { name: "Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
 ];
 
 export default function App() {

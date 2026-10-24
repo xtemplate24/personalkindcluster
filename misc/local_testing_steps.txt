@@ -3,5 +3,5 @@
 cd apps/app3/frontend
 npm install     # installs React and Vite, first time only
 npm run dev     # starts the dev server
-
+npm run dev -- --host # for mobile testing
 do all these in powershell

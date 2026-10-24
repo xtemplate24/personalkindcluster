@@ -28,7 +28,7 @@ export default function App() {
         <div className="hero-copy">
           <h1>Welcome to my personal cluster.</h1>
           <p className="lede">
-            Private apps secured with OAuth. Single-node k3s cluster running on HP EliteDesk.
+            Private apps secured with OAuth. <br></br> Single-node k3s cluster running on HP EliteDesk.
           </p>
 
           <p className="sub">

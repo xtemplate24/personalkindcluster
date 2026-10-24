@@ -1,8 +1,11 @@
 import "./App.css";
 import { useEffect, useState } from "react";
 
-const apps = [
+const pub_apps = [
   { name: "Currency Converter", url: "https://app1.xtemplate.cc", label: "app1.xtemplate.cc" },
+];
+
+const priv_apps = [
   { name: "Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
   { name: "Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
 ];
@@ -23,14 +26,30 @@ export default function App() {
     <div className="page">
       <div className="hero">
         <div className="hero-copy">
-          <h1>The front door to a personal cluster.</h1>
+          <h1>Welcome to my personal cluster.</h1>
           <p className="lede">
-            This page is open to anyone. Everything past it needs a GitHub
-            sign-in.
+            Private apps secured with OAuth. Single-node k3s cluster running on HP EliteDesk.
+          </p>
+
+          <p className="sub">
+            Public Apps
           </p>
 
           <nav className="apps" aria-label="Applications">
-            {apps.map((app) => (
+            {pub_apps.map((app) => (
+              <a key={app.url} href={app.url} className="app-link">
+                <span>{app.name}</span>
+                <span className="app-path">{app.label}</span>
+              </a>
+            ))}
+          </nav>
+
+          <p className="sub">
+            Private Apps
+          </p>
+
+          <nav className="apps" aria-label="Applications">
+            {priv_apps.map((app) => (
               <a key={app.url} href={app.url} className="app-link">
                 <span>{app.name}</span>
                 <span className="app-path">{app.label}</span>
@@ -41,16 +60,8 @@ export default function App() {
 
         <aside className="status" aria-label="Cluster status">
           <div className="status-row">
-            <span className="dot dot-ok" />
-            <span>cluster: myowncluster</span>
-          </div>
-          <div className="status-row">
             <span className="dot dot-open" />
-            <span>this page: public</span>
-          </div>
-          <div className="status-row">
-            <span className="dot dot-auth" />
-            <span>everything else: GitHub OAuth</span>
+            <span>cluster: xtemplatehomelab</span>
           </div>
           <div className="status-row">
             <span className="dot dot-ok" />

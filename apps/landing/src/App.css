@@ -44,11 +44,20 @@ h1 {
   margin: 0 0 36px;
 }
 
+.sub {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--text-soft);
+  max-width: 46ch;
+  margin: 0 0 15px;
+}
+
 /* ---------- app links: one glass pill per app ---------- */
 .apps {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-bottom: 15px;
 }
 
 .app-link {

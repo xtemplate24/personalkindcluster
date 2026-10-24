@@ -1,3 +1,5 @@
+/* Colours, glass recipe and the aurora background live in index.css (:root). */
+
 .page {
   min-height: 100%;
   display: flex;
@@ -15,14 +17,8 @@
 }
 
 @keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .hero-copy {
@@ -37,64 +33,80 @@ h1 {
   line-height: 1.1;
   letter-spacing: -0.01em;
   margin: 0 0 20px;
-  color: #f4f6f5;
+  color: var(--text-strong);
 }
 
 .lede {
   font-size: 1.05rem;
   line-height: 1.6;
-  color: #b7c3c5;
+  color: var(--text-soft);
   max-width: 46ch;
   margin: 0 0 36px;
 }
 
+/* ---------- app links: one glass pill per app ---------- */
 .apps {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  border-top: 1px solid #223133;
+  gap: 12px;
 }
 
 .app-link {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  padding: 16px 4px;
-  border-bottom: 1px solid #223133;
+  gap: 16px;
+  padding: 18px 22px;
   text-decoration: none;
-  color: #e8ecea;
+  color: var(--text);
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.1rem;
   font-weight: 500;
-  transition: color 150ms ease, border-color 150ms ease;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-radius: var(--btn-radius);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: rise 500ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 80ms + 200ms);
+  transition: transform 0.15s, border-color 0.2s, background 0.2s, color 0.2s;
 }
 
 .app-link:hover,
 .app-link:focus-visible {
-  color: #f2a65a;
-  border-color: #f2a65a;
+  transform: translateY(-2px);
+  color: var(--accent);
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
 }
 
+.app-link:active { transform: scale(0.98); }
+
 .app-link:focus-visible {
-  outline: 2px solid #f2a65a;
-  outline-offset: 4px;
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .app-path {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.85rem;
-  color: #7e9296;
+  color: var(--muted);
 }
 
+/* ---------- status: a glass panel ---------- */
 .status {
   flex: 0 1 300px;
-  border: 1px solid #223133;
-  border-radius: 6px;
   padding: 22px 24px;
-  background: #131f21;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.85rem;
-  color: #b7c3c5;
+  color: var(--text-soft);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -114,22 +126,22 @@ h1 {
 }
 
 .dot-ok {
-  background: #6fd6c4;
-  box-shadow: 0 0 6px #6fd6c4a0;
+  background: var(--teal);
+  box-shadow: 0 0 8px var(--teal);
 }
 
 .dot-open {
-  background: #f2a65a;
-  box-shadow: 0 0 6px #f2a65aa0;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
 }
 
 .dot-auth {
-  background: #7e9296;
+  background: var(--muted);
 }
 
 .footer {
   padding-top: 32px;
-  color: #5f7175;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -141,5 +153,10 @@ h1 {
 
   .status {
     flex-basis: auto;
+  }
+
+  .app-link {
+    flex-direction: column;
+    gap: 4px;
   }
 }

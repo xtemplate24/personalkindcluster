@@ -7,3 +7,5 @@ notifications:
 configs:
   cm:
     timeout.reconciliation: 10s
+  params:
+    server.insecure: true 

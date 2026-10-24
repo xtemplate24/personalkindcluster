@@ -104,7 +104,7 @@ Confirms the cluster answers. The node should show `Ready`.
 ## 4. Install Traefik (the front door)
 
 ```bash
-helm repo add traefik https://traefik.github.io/charts
+helm repo add traefik https://traefik.github.io/charts --version 41.6.0
 helm repo update
 helm install traefik traefik/traefik \
   --namespace traefik --create-namespace \
@@ -128,7 +128,7 @@ Wait until the pod is `Running` and `1/1` ready.
 ## 5. Install Argo CD (the deployer)
 
 ```bash
-helm repo add argo https://argoproj.github.io/argo-helm
+helm repo add argo https://argoproj.github.io/argo-helm --version 10.9.2
 helm repo update
 helm install argocd argo/argo-cd \
   --namespace argocd --create-namespace \

@@ -1,80 +1,251 @@
-## CICD structure
+# xtemplate home lab
+
+A small, always-on Kubernetes home lab running on an HP EliteDesk, serving a handful of self-built apps at
+`*.xtemplate.cc`. Everything is built by GitHub Actions, deployed by Argo CD, and locked behind a GitHub
+login.
+
+> **Where this came from:** the repo started as a DevSecOps take-home challenge (a secured nginx
+> "hello world" on a local kind cluster). It has since grown into a personal lab: the hello-world pages are
+> gone, real apps have replaced them, and the cluster moved from kind on a laptop to k3s on a dedicated
+> machine. Some leftovers from that first phase are noted under [Known gaps](#known-gaps--leftovers).
+
+---
+
+## What's running
+
+| URL | What it is | Login? |
+|---|---|---|
+| `https://xtemplate.cc` | Landing page with links to everything below | No |
+| `https://app1.xtemplate.cc` | Currency converter (React frontend + Express backend, live rates or a custom rate) | See [gaps](#known-gaps--leftovers) |
+| `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
+| `https://app3.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
+| `https://argocd.xtemplate.cc` | Argo CD UI | Yes |
+| `https://console.xtemplate.cc` | Headlamp (cluster dashboard) | Yes |
+
+"Login" means: you must sign in with GitHub **and** be a member of the `team-xtemplate` team in the
+`team-jared` GitHub organisation. One login covers every subdomain (the cookie is shared across
+`.xtemplate.cc`).
+
+---
+
+## How it fits together
 
 ```mermaid
 flowchart LR
-  dev["git push to main"] --> gha["GitHub Actions: build, Trivy gate, push to GHCR"]
-  gha --> commit["Pipeline commits new image digest into the manifest"]
-  commit --> argo["Argo CD (inside the cluster) pulls the repo"]
-  argo --> app["nginx Deployment"]
+  user["Browser"] --> cf["Cloudflare<br/>DNS + HTTPS"]
+  cf -->|"outbound tunnel<br/>(no open ports)"| cfd["cloudflared pod"]
+  cfd --> traefik["Traefik<br/>routes by hostname"]
+  traefik -->|"ForwardAuth"| o2p["oauth2-proxy<br/>GitHub team check"]
+  traefik --> apps["landing / app1 / app2 / app3<br/>Argo CD / Headlamp"]
+
+  dev["git push to main"] --> gha["GitHub Actions<br/>build + Trivy scan + push to GHCR"]
+  gha --> commit["bot commits new image digest<br/>into app-deployments/"]
+  commit --> argo["Argo CD (in cluster)<br/>auto-syncs"]
+  argo --> apps
 ```
 
-**Main flow:** Anytime git push is done to the main branch, github actions is triggered to build and scan the image (CI), with a secondary job to update the deployment yaml for the applications with the new image digest. Since ArgoCD application is set to auto-sync, this ensures a totally automated CICD process after the developers push their code. 
+**In plain words:**
+
+1. **Getting in.** A visitor hits Cloudflare. Cloudflare passes the request down a tunnel that the
+   `cloudflared` pod opened *from inside* the cluster, so the home router needs no port forwarding.
+2. **Routing.** Traefik looks at the hostname (`app3.xtemplate.cc`, etc.) and picks the right app.
+3. **Login check.** Before reaching a protected app, Traefik asks oauth2-proxy "is this person signed in
+   and in the right GitHub team?" If not, they're sent to the GitHub login page.
+4. **Deploying.** Pushing app code to `main` triggers that app's workflow. It builds the image, scans it,
+   pushes it to GHCR, then commits the new image digest into the app's `deployment.yaml`. Argo CD notices
+   the commit and rolls the change out. No `kubectl` from a laptop.
+
+---
+
+## The stack
+
+| Layer | What's used | Notes |
+|---|---|---|
+| Hardware | HP EliteDesk 800 G4 Mini (i5-8500T, 16 GB RAM, 512 GB NVMe) | Hostname `xtemplatehomelab.local`, managed over SSH. Dual-boots Windows. |
+| OS | Ubuntu | |
+| Kubernetes | **k3s** (single node) | Installed with k3s's bundled Traefik **disabled**, so we run our own. |
+| Ingress | Traefik (Helm) | Values in `platform/traefik-values.yaml`. Self-signed default cert (Cloudflare does the public HTTPS). |
+| Auth | oauth2-proxy + Traefik ForwardAuth middlewares | GitHub OAuth app owned by the `team-jared` org. |
+| Public access | Cloudflare Tunnel (`cloudflared` running as a pod) | Domain `xtemplate.cc` on Cloudflare DNS. |
+| GitOps | Argo CD (Helm) | Apps created in the Argo CD UI, each pointing at a folder under `app-deployments/`. |
+| CI | GitHub Actions | One reusable workflow, one small caller per image. |
+| Registry | GHCR (`ghcr.io/xtemplate24/...`) | Images pinned by digest in the manifests. |
+| Runtime scanning | Trivy Operator (Helm) | Daily rescans, results as `VulnerabilityReport` objects. No notifications (ntfy was dropped). |
+| Storage | k3s `local-path` provisioner | Used by app3's SQLite volume. |
+
+> **Coming from OpenShift?** A few rough equivalents: Traefik `Ingress` + `Middleware` ≈ an OpenShift
+> `Route`; Cloudflare Tunnel replaces exposing a router to the internet; Pod Security `restricted` labels on
+> namespaces ≈ the `restricted` SCC.
+
+---
 
 ## Repository layout
 
-| Path | What it holds |
+| Path | What's in it |
 |---|---|
-| `apps/hello-nginx`, `apps/second-page` | Dockerfile + static `index.html` for each app |
-| `app-deployments/` | Kubernetes manifests that Argo CD deploys |
-| `gitops/` | Argo CD `Application` definitions |
-| `platform/` | Helm values for Traefik, Argo CD and Trivy Operator |
-| `cluster/kind-config.yaml` | Local kind cluster (ports 80/443 mapped to the host) |
-| `.github/workflows/` | Reusable `build-image.yaml` plus one small caller per app |
+| `apps/<app>/` | Source code + `Dockerfile` for each image (`landing`, `app1/{frontend,backend}`, `app2/{ui,llm}`, `app3/{frontend,backend}`) |
+| `app-deployments/<app>/` | Kubernetes manifests (namespace, deployment, service, ingress, PVC). **This is what Argo CD watches.** |
+| `platform/` | Cluster-wide pieces installed by hand: Helm values (Traefik, Argo CD, Trivy), `auth/` (oauth2-proxy + middlewares), `cloudflare/` (tunnel), `argocd/` and `headlamp/` ingresses |
+| `.github/workflows/` | `build-image.yaml` (reusable template), one caller per image, `create-lockfile.yaml`, weekly `cleanup-registry.yaml` |
+| `misc/DEPLOYMENT.md` | Step-by-step rebuild guide (written for the kind era; see note below) |
+| `gitops/`, `cluster/kind-config.yaml` | Leftovers from the take-home phase, not used on k3s |
 
+---
 
-## 1. Outcomes that were looked for
+## CI/CD in detail
 
-1. **The page is served from an image you built.** — Yeap, done!
-2. **Everything lives in a Git repository** — Done as well
-3. **It reaches the cluster through automation, not your laptop.** — Heavy reliance on github actions but yes CICD is handled via automation
-4. **Vulnerability scanning runs on a schedule inside the cluster** — Trivy-operator doing the heavy lifting, only a simple webhoot to ntfy for notifications and they really spam a lot since no control on what get's sent. 
-5. **Nobody reaches the page without authenticating.** An anonymous visitor holding the URL should not see the hello world page.
+Each image has its own small workflow (e.g. `app3-backend-build.yaml`) that only runs when files in that
+app's folder change. They all call the same template, `build-image.yaml`, which:
 
-## 3. Security expectations 
+1. **Builds** the image locally on the runner (not pushed yet).
+2. **Scans** it with Trivy for HIGH/CRITICAL issues that have a fix.
+3. **Pushes** it to `ghcr.io/xtemplate24/<name>:<git-sha>`.
+4. **Updates the manifest** (separate job): writes `image: ...@sha256:<digest>` into the app's
+   `deployment.yaml` and commits it to `main` as `github-actions[bot]`.
 
-### Pipeline credentials
-- **Registry:** the workflow logs in to GHCR with the built-in `GITHUB_TOKEN`. It is short-lived, created per run, and limited to that job (`packages: write`). No stored registry secret. 
-- **Cluster:** got a bit lazy but the repo is public, so argoCD does not have to authenticate with it to check the repo state. Plan to add maybe ssh authentication in the future. 
-- **Repo write access:** the manifest-update job has `contents: write` only, and only on that job. It pushes the digest change to `main`. **TODO:** mention branch protection as a production concern, since a workflow that can push to `main` is powerful.
-- **Long-lived secrets that do exist:**
-  - GitHub OAuth client secret and cookie secret: Kubernetes Secret in `hello-web` that was created manually. Readable by cluster admins. It can be rotated if a new secret is generated via Github UI.
-  - `ghcr-pull` for `second-page`: second-page was used to test the pull-secret approach to pulling images from GCHR. It works, but it's just stored as a kubernetes secret. It only has read permissions when the token was generated via Github UI
+Argo CD is set to auto-sync, so step 4 is what actually deploys.
 
-### Acting on scan results
-- **Build time:** the pipeline fails on fixable HIGH or CRITICAL findings, so a vulnerable image is never pushed.
-- **Runtime:** Trivy Operator rescans every 24 hours and posts each report to ntfy.sh. That catches vulnerabilities published *after* an image was deployed. 
-- **A pretty crappy webhook solution cause no time:** the webhook sends every report as raw JSON with no severity filter, so anything goes and it spams the ntfy topic. Will address in the future. 
-- **Future improvements:** Add some kinda filter to parse the generated report and send a clean json via webhook.
+Other workflows:
 
-### The finding I can't fix
-1. For runtime scans if a critical vulnerability is picked up by trivy during the daily scan, I think the best course of action would be to scale down the deployment, until a clean base-image can be found and rebuilt, passing through the scans again.
+- **`create-lockfile.yaml`**: run by hand to generate a `package-lock.json` for a new Node app.
+- **`cleanup-registry.yaml`**: every Sunday, keeps the 5 newest versions of each GHCR package and deletes
+  the rest.
 
-### Image hygiene
-- **Base image:** `nginxinc/nginx-unprivileged:stable-alpine`, pinned by digest. It is small (Alpine) and built to run without root.
-- **Not root:** UID 101, port 8080, read-only root filesystem, with `/tmp` as an `emptyDir` because nginx needs a writable spot.
-- **Deployed image is pinned too:** the pipeline writes the digest into the Deployment, so it kinda guarantees the latest image so long as no one messess around with it.
+---
 
-### Scan coverage
+## Security notes
+
+**Credentials**
+
+- CI logs in to GHCR with the per-run `GITHUB_TOKEN` (short-lived, `packages: write` on the build job
+  only). No stored registry secret.
+- Only the manifest-update job gets `contents: write`, which it needs to push the digest commit.
+- Secrets created by hand in the cluster, **never in git**:
+  - `oauth2-proxy` in `auth` (GitHub client ID/secret + cookie secret)
+  - `cloudflare-tunnel-secret` in `cloudflare` (tunnel token)
+
+**Workload hardening** (applied across the app deployments and oauth2-proxy)
+
+- Namespaces enforce the Pod Security `restricted` level.
+- Containers run as non-root, drop all capabilities, block privilege escalation, use seccomp
+  `RuntimeDefault`, and have a read-only root filesystem (with an `emptyDir` at `/tmp` where needed).
+- Service account tokens are not mounted; CPU/memory requests and limits are set.
+- Images are pinned by digest, so what runs is exactly what was scanned.
+
+**Scanning**
+
 | Layer | Status | Catches | Misses |
 |---|---|---|---|
-| Build-time image scan (Trivy in CI) | Built | Known CVEs before an image is pushed | Anything disclosed later |
-| Runtime scan (Trivy Operator) | Built | CVEs published after deploy; third-party images I did not build | Misconfiguration in code before it is applied |
-| Infrastructure-code scan (Trivy config, Checkov, or similar on manifests and Terraform) | Risky settings in YAML/Terraform before apply | Vulnerabilities inside images |
+| Build-time (Trivy in CI) | Running, but not blocking (see gaps) | Known CVEs at build time | Anything disclosed later |
+| Runtime (Trivy Operator) | Running, daily | New CVEs in deployed images, including third-party ones | Misconfigured YAML before it's applied |
+| Config scan (Trivy config / Checkov) | Not built | Risky settings in manifests | — |
 
-### Least privilege
-- **In the cluster (built):** namespaces enforce the `restricted` Pod Security level; all capabilities dropped; no privilege escalation; seccomp `RuntimeDefault`; service account token not mounted; resource limits set.
-- **Future improvements:** Maybe implement network policies
+**Exposure**
 
-## 5. Evidence it works
+- Nothing on the home network is port-forwarded. The only way in is the Cloudflare tunnel.
+- Everything except the landing page sits behind oauth2-proxy (with the app1 exception noted below).
 
-1. It works... you can view the alerts here https://ntfy.sh/trivy-alerts-91f5d6f881b3
-2. Screenshots as attached https://we.tl/t-dtH7j1BPEyLNhLoN
+---
 
-## 6. Known limitations
+## Everyday tasks
 
-- The ntfy topic name acts as a password. It is kept out of Git, but it sits in plain text in the Helm release and the operator's pod spec.
-- The alert webhook is unfiltered and noisy.
-- Self-signed certificate (Traefik default), plan to use actual cert in the future.
-- No fixes done for found CVEs
-- Currently repo is accessible by all, to limit in the future
+All commands are run on the EliteDesk over SSH (or anywhere with a kubeconfig for the cluster).
 
+### Check that everything is healthy
+
+```bash
+kubectl get pods -A
+```
+Lists every pod in every namespace. Everything should be `Running` (or `Completed` for scan jobs).
+
+```bash
+kubectl get applications -n argocd
+```
+Shows each Argo CD app. You want `Synced` and `Healthy`.
+
+### Change an app
+
+Edit code under `apps/...`, commit, push to `main`. The pipeline builds it and Argo CD deploys it.
+
+### Add a new app
+
+1. Put the code and a `Dockerfile` in `apps/<name>/`.
+2. Copy an existing caller workflow in `.github/workflows/` and point it at the new folder and manifest.
+3. For a Node app, run the **create-lockfile** workflow once for the new folder.
+4. Add manifests in `app-deployments/<name>/`: namespace, deployment, service, ingress. For a login-protected
+   app, the ingress needs host `<name>.xtemplate.cc` and this annotation:
+   ```yaml
+   traefik.ingress.kubernetes.io/router.middlewares: auth-oauth2-proxy-errors@kubernetescrd,auth-oauth2-proxy-auth@kubernetescrd
+   ```
+5. In the Argo CD UI, create an Application pointing at `app-deployments/<name>/` with auto-sync on.
+6. In the Cloudflare dashboard, add a published route for `<name>.xtemplate.cc` →
+   `https://traefik.traefik.svc.cluster.local:443` with **No TLS Verify** turned on.
+
+### See scan results
+
+```bash
+kubectl get vulnerabilityreports -A
+```
+One report per scanned container image, with counts by severity.
+
+### Back up app3's data
+
+app3 stores its SQLite file at `/data/app3.db` on a `local-path` volume on the EliteDesk's disk.
+
+```bash
+POD=$(kubectl get pod -n app3 -l app=app3-backend -o jsonpath='{.items[0].metadata.name}')
+kubectl cp app3/$POD:/data/app3.db ./app3-backup-$(date +%F).db
+```
+The first line finds the backend pod's name; the second copies the database file out of it into the
+current folder, with today's date in the name.
+
+---
+
+## Rebuilding from scratch
+
+`misc/DEPLOYMENT.md` walks through the full rebuild (OAuth app, secrets, oauth2-proxy, Cloudflare tunnel,
+Argo CD, Trivy). It was written for kind, so on k3s swap these steps:
+
+- **Instead of `kind create cluster`**, install k3s with its bundled Traefik turned off:
+  ```bash
+  curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable traefik" sh -
+  ```
+  Then copy `/etc/rancher/k3s/k3s.yaml` to `~/.kube/config` so `kubectl` works as your user.
+- **Label the node** so our Traefik values (which select `ingress-ready=true`) can schedule:
+  ```bash
+  kubectl label node $(hostname) ingress-ready=true
+  ```
+- **Skip `kubectl apply -f gitops/`**. Create the Argo CD Applications in the UI instead.
+- **Argo CD UI**: apply `platform/argocd/argocd-ingress.yaml` and add an `argocd.xtemplate.cc` tunnel route
+  instead of port-forwarding.
+- **Trivy Operator**: install without the `--set operator.webhookBroadcastURL=...` line (no ntfy).
+
+---
+
+## Known gaps / leftovers
+
+Things worth fixing, roughly in order of importance:
+
+- **app1's ingress has no auth middleware.** `app-deployments/app1/frontend/ingress.yaml` is missing the
+  `router.middlewares` annotation that app2/app3 have, so app1 may be reachable without logging in.
+- **The CI Trivy step doesn't block.** `build-image.yaml` sets `exit-code: "0"`, so a vulnerable image is
+  reported but still pushed. Set it to `"1"` to make it a real gate.
+- **`cloudflared` uses the `:latest` tag**, unlike everything else, which is pinned by digest.
+- **Stale take-home files:** `gitops/` still defines the old `hello-nginx` / `second-page` apps, and
+  `cleanup-registry.yaml` still lists their packages. `cluster/kind-config.yaml` is kind-only.
+- **No network policies** yet; any pod can talk to any other pod.
+- **Self-signed cert at Traefik.** Fine behind Cloudflare (traffic to the tunnel is encrypted), but the
+  tunnel routes need **No TLS Verify**.
+- **No branch protection on `main`**, because the pipeline pushes digest commits directly. The cleaner
+  option is having the bot open a PR instead.
+- **Backups are manual.** app3's data lives on the internal NVMe only.
+
+---
+
+## Roadmap
+
+- Use the 4 TB Seagate portable drive as attached storage for the cluster and for backups (maybe Plex later).
+- **app4**: a small custom app to control a smart bulb on the home network (instead of Home Assistant).
+- Learn **Kafka** and **Redis** with a simulated scenario running in the lab.
+- Give app2 a bigger/better model, ideally running on a GPU instead of CPU.
+- Remote access to the box via Tailscale.

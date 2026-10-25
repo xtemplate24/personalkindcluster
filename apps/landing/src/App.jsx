@@ -9,6 +9,7 @@ const pub_apps = [
 const priv_apps = [
   { name: "Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
   { name: "Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
+  { name: "Notes", url: "https://notes.xtemplate.cc", label: "notes.xtemplate.cc" },
 ];
 
 const admin_links = [

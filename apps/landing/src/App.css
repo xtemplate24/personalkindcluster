@@ -8,9 +8,6 @@
   padding: clamp(24px, 6vw, 96px);
 }
 
-/* ---------- top-right admin menu (signed-in only) ----------
-   One glass pill holding the links. position: fixed keeps it pinned to the
-   top-right corner even when the page scrolls.                            */
 /* ---------- expanding admin menu (signed-in only) ---------- */
 .menu {
   position: fixed;
@@ -190,55 +187,79 @@ h1 {
   margin: 0 0 15px;
 }
 
-/* ---------- app links: one glass pill per app ---------- */
+/* ---------- app icons: round glass tiles with the name underneath ---------- */
 .apps {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 22px 18px;
+  margin-bottom: 28px;
 }
 
-.app-link {
+.app-tile {
+  width: 92px;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 16px;
-  padding: 18px 22px;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-decoration: none;
-  color: var(--text);
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1.1rem;
-  font-weight: 500;
-  background: var(--glass-bg);
+  color: var(--text-soft);
+  animation: rise 500ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 70ms + 200ms);
+}
+
+/* the glass circle; --tint is each app's own colour, set in App.jsx */
+.app-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: rgb(var(--tint));
+  background:
+    radial-gradient(circle at 30% 25%, rgba(var(--tint), 0.28), transparent 65%),
+    var(--glass-bg);
   border: var(--glass-border);
-  border-radius: var(--btn-radius);
   box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  animation: rise 500ms ease-out both;
-  animation-delay: calc(var(--i, 0) * 80ms + 200ms);
-  transition: transform 0.15s, border-color 0.2s, background 0.2s, color 0.2s;
+  transition: transform 0.2s, box-shadow 0.25s, border-color 0.2s, background 0.2s;
 }
 
-.app-link:hover,
-.app-link:focus-visible {
-  transform: translateY(-2px);
-  color: var(--accent);
-  background: var(--glass-bg-hover);
-  border-color: var(--glass-border-hover);
+.app-circle svg {
+  width: 30px;
+  height: 30px;
 }
 
-.app-link:active { transform: scale(0.98); }
+.app-name {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  transition: color 0.2s;
+}
 
-.app-link:focus-visible {
+.app-tile:hover .app-circle,
+.app-tile:focus-visible .app-circle {
+  transform: translateY(-3px) scale(1.04);
+  border-color: rgba(var(--tint), 0.55);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(var(--tint), 0.4), transparent 70%),
+    var(--glass-bg-hover);
+  box-shadow: var(--glass-shadow), 0 0 26px rgba(var(--tint), 0.35);
+}
+
+.app-tile:hover .app-name,
+.app-tile:focus-visible .app-name {
+  color: var(--text-strong);
+}
+
+.app-tile:active .app-circle { transform: scale(0.95); }
+
+.app-tile:focus-visible { outline: none; }
+.app-tile:focus-visible .app-circle {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-}
-
-.app-path {
-  font-family: "IBM Plex Mono", monospace;
-  font-size: 0.85rem;
-  color: var(--muted);
 }
 
 /* ---------- status: a glass panel ---------- */
@@ -300,15 +321,5 @@ h1 {
 
   .status {
     flex-basis: auto;
-  }
-
-  .app-link {
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  /* on phones, push the content down so the menu doesn't sit on the heading */
-  .page:has(.topnav) {
-    padding-top: 84px;
   }
 }

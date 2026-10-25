@@ -21,7 +21,7 @@ export default function App() {
         <a className="back" href="https://xtemplate.cc">
           ← xtemplate.cc
         </a>
-        <h1>Bus &amp; MRT timings.</h1>
+        <h1>Bus &amp; MRT timings</h1>
         <p className="lede">Live arrivals across Singapore. Save stops, pick the one you're chasing.</p>
 
         <div className={`switch mode-${mode}`} role="tablist" aria-label="Transport mode">

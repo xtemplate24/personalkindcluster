@@ -34,6 +34,7 @@ p { margin: 0; }
 
 /* ---------- buttons: glass pills (same as app3) ---------- */
 .back {
+  width: 100%;
   display: inline-block;
   margin-bottom: 22px;
   font-family: "IBM Plex Mono", monospace;

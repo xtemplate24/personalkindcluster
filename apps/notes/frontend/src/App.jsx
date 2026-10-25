@@ -135,9 +135,9 @@ function NoteList({ usage, onOpen }) {
   return (
     <div className="screen">
       <header className="top">
-          <a className="back" href="https://xtemplate.cc">
-            ← xtemplate.cc
-          </a>
+        <a className="back" href="https://xtemplate.cc">
+            ← xtemplate.ccs
+        </a>
         <div>
           <h1>Notes</h1>
           <p className="muted small">Your notes and files, stored on the home lab.</p>

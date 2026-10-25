@@ -2,8 +2,19 @@ import { useEffect, useRef, useState } from "react";
 
 // Map of nearby stops. Leaflet is bundled into our own image (no CDN), and
 // loaded only when the map is first shown so the main page stays small.
-// Tiles: CARTO's dark basemap (OpenStreetMap data) — free, no key, and it
-// matches the dark aurora theme. Tapping a stop opens its card below.
+// Tiles: CARTO's dark basemap (OpenStreetMap data), which matches the dark
+// aurora theme. Since Sept 2026 CARTO needs a free key; the frontend server
+// hands it to the page via /config.json (from a Kubernetes Secret). With no
+// key we fall back to the standard OpenStreetMap tiles so the map still works.
+// Tapping a stop opens its card below.
+
+let configPromise = null;
+const loadConfig = () =>
+  (configPromise ||= fetch("/config.json")
+    .then((r) => (r.ok ? r.json() : {}))
+    .catch(() => ({})));
+
+const OSM = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 export default function StopMap({ position, stops, savedCodes, onSelect }) {
   const el = useRef(null);
   const map = useRef(null);
@@ -17,16 +28,25 @@ export default function StopMap({ position, stops, savedCodes, onSelect }) {
       try {
         const L = (await import("leaflet")).default;
         await import("leaflet/dist/leaflet.css");
+        const { cartoKey } = await loadConfig();
         if (cancelled || !el.current) return;
 
         if (!map.current) {
           map.current = L.map(el.current, { zoomControl: false, attributionControl: true });
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-            maxZoom: 19,
-            subdomains: "abcd",
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          }).addTo(map.current);
+          const tiles = cartoKey
+            ? L.tileLayer(
+                `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoKey)}`,
+                {
+                  maxZoom: 19,
+                  subdomains: "abcd",
+                  attribution: `${OSM} &copy; <a href="https://carto.com/attributions">CARTO</a>`,
+                }
+              )
+            : L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: OSM,
+              });
+          tiles.addTo(map.current);
           L.control.zoom({ position: "bottomright" }).addTo(map.current);
         }
 

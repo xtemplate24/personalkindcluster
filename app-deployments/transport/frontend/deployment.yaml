@@ -28,6 +28,16 @@ spec:
             # Server-side calls only — never sent to the browser.
             - name: BACKEND_URL
               value: "http://transport-backend-svc.transport.svc.cluster.local:8080"
+            # CARTO basemap key for the map tiles, created by hand (never in git):
+            #   kubectl create secret generic transport-carto -n transport \
+            #     --from-literal=basemap-key='<your key>'
+            # optional: true = without it the map uses standard OpenStreetMap tiles.
+            - name: CARTO_BASEMAP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: transport-carto
+                  key: basemap-key
+                  optional: true
           ports:
             - containerPort: 8080
               name: http

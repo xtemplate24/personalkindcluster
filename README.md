@@ -17,7 +17,7 @@ login.
 |---|---|---|
 | `https://xtemplate.cc` | Landing page with links to everything below | No |
 | `https://app1.xtemplate.cc` | Currency converter (React frontend + Express backend, live rates or a custom rate) | See [gaps](#known-gaps--leftovers) |
-| `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed; saved stops and target bus/train in the browser's localStorage) | No (public) |
+| `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed + CARTO map tiles; saved stops and target bus/train in the browser's localStorage) | No (public) |
 | `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
 | `https://app3.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
 | `https://argocd.xtemplate.cc` | Argo CD UI | Yes |
@@ -125,6 +125,7 @@ Other workflows:
   - `oauth2-proxy` in `auth` (GitHub client ID/secret + cookie secret)
   - `cloudflare-tunnel-secret` in `cloudflare` (tunnel token)
   - `transport-lta` in `transport` (LTA DataMall account key, optional)
+  - `transport-carto` in `transport` (CARTO basemap key, optional)
 
 **Workload hardening** (applied across the app deployments and oauth2-proxy)
 
@@ -214,7 +215,7 @@ forwards and caches upstream data (15 s per stop/station) and rate-limits each v
 | Bus stops + live bus arrivals | LTA DataMall (`v3/BusArrival`, `BusStops`) | Yes, free. Without it the app falls back to the community BusRouter feeds. |
 | MRT disruption alerts | LTA DataMall (`TrainServiceAlerts`) | Yes |
 | Live train times | SMRT's train-arrival feed (unofficial) | No. SMRT lines only: NSL, EWL, CCL, TEL, BPLRT |
-| Map | Leaflet + CARTO dark tiles, plus "Open in Google Maps" links | No |
+| Map tiles | CARTO dark basemap (Leaflet), plus "Open in Google Maps" links | Yes, free (since Sept 2026). Without it the map falls back to standard OpenStreetMap tiles. |
 
 Add the LTA key (get one at datamall.lta.gov.sg, "Request for API Access"):
 
@@ -224,6 +225,13 @@ kubectl rollout restart deployment/transport-backend -n transport
 ```
 The first line stores the key as a Secret in the `transport` namespace; the second restarts the backend so
 it picks the key up.
+
+Add the CARTO map key (free at carto.com/basemaps/apikey; restrict it to `transport.xtemplate.cc`):
+
+```bash
+kubectl create secret generic transport-carto -n transport --from-literal=basemap-key='YOUR_KEY'
+kubectl rollout restart deployment/transport-frontend -n transport
+```
 
 ---
 

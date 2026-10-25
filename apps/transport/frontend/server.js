@@ -10,6 +10,10 @@ const PORT = process.env.PORT || 8080;
 // Set via transport-frontend's Deployment env — points at the backend's
 // ClusterIP service. Never exposed to the browser directly.
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8081";
+// CARTO basemap key (from the transport-carto Secret). It ends up in the
+// visitor's browser anyway (it's part of every map tile URL), so protect it
+// by restricting it to transport.xtemplate.cc in CARTO's key settings.
+const CARTO_KEY = process.env.CARTO_BASEMAP_KEY || "";
 
 // Basic browser hardening. The CSP lists exactly what the page loads:
 // our own files, Google Fonts, and the map tiles (CARTO). Location access is
@@ -24,7 +28,7 @@ app.use((req, res, next) => {
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src https://fonts.gstatic.com",
-      "img-src 'self' data: https://*.basemaps.cartocdn.com",
+      "img-src 'self' data: https://*.basemaps.cartocdn.com https://basemaps.cartocdn.com https://tile.openstreetmap.org",
       "connect-src 'self'",
       "frame-ancestors 'none'",
       "base-uri 'self'",
@@ -49,6 +53,12 @@ app.use(
 app.get("/", (req, res) => {
   res.set("Cache-Control", "no-cache");
   res.sendFile(path.join(__dirname, "dist", "index.html"));
+});
+
+// Runtime settings for the page, so the key isn't baked into the image.
+app.get("/config.json", (req, res) => {
+  res.set("Cache-Control", "no-cache");
+  res.json({ cartoKey: CARTO_KEY || null });
 });
 
 // Forward every GET /api/... to the backend, query string included.

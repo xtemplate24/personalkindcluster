@@ -8,6 +8,135 @@
   padding: clamp(24px, 6vw, 96px);
 }
 
+/* ---------- top-right admin menu (signed-in only) ----------
+   One glass pill holding the links. position: fixed keeps it pinned to the
+   top-right corner even when the page scrolls.                            */
+/* ---------- expanding admin menu (signed-in only) ---------- */
+.menu {
+  position: fixed;
+  top: clamp(14px, 3vw, 28px);
+  right: clamp(14px, 3vw, 28px);
+  z-index: 10;
+  animation: drop 450ms ease-out both;
+}
+
+@keyframes drop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* the round button with three lines */
+.menu-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transition: transform 0.15s, background 0.2s, border-color 0.2s;
+}
+.menu-btn:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
+.menu-btn:active { transform: scale(0.94); }
+.menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.bar {
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--text);
+  transition: transform 0.3s ease, opacity 0.2s ease;
+}
+
+/* when open, the three lines turn into an X */
+.menu.open .bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.menu.open .bar:nth-child(2) { opacity: 0; }
+.menu.open .bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* the panel that drops down (hidden until open) */
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 200px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(145deg, rgba(var(--white-rgb), 0.14), rgba(var(--white-rgb), 0.05));
+  border: var(--glass-border);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+  transform-origin: top right;
+  opacity: 0;
+  transform: scale(0.9) translateY(-6px);
+  pointer-events: none;          /* can't click it while hidden */
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.menu.open .menu-panel {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  pointer-events: auto;
+}
+
+.menu-title {
+  padding: 4px 12px 6px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.menu-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 14px;
+  color: var(--text);
+  text-decoration: none;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+.menu-link:hover,
+.menu-link:focus-visible {
+  background: rgba(var(--white-rgb), 0.1);
+  color: var(--accent);
+}
+
+.menu-arrow {
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.menu-link:hover .menu-arrow,
+.menu-link:focus-visible .menu-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* links slide in one after another when the menu opens */
+.menu.open .menu-link {
+  animation: fadeSlide 0.3s ease-out both;
+  animation-delay: calc(var(--i, 0) * 50ms + 60ms);
+}
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 .hero {
   flex: 1;
   display: flex;
@@ -168,5 +297,10 @@ h1 {
   .app-link {
     flex-direction: column;
     gap: 4px;
+  }
+
+  /* on phones, push the content down so the menu doesn't sit on the heading */
+  .page:has(.topnav) {
+    padding-top: 84px;
   }
 }

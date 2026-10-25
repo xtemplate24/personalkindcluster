@@ -27,7 +27,7 @@ spec:
       containers:
         - name: backend
           # The build-image pipeline fills in the @sha256 digest after the first push.
-          image: ghcr.io/xtemplate24/notes-backend
+          image: ghcr.io/xtemplate24/notes-backend@sha256:65bb79c7d218e8407e8082b4f91732fbc7e306c52e8c5124687b10afc3b65b71
           imagePullPolicy: IfNotPresent
           env:
             - name: DB_PATH

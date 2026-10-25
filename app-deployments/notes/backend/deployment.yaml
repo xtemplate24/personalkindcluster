@@ -27,7 +27,7 @@ spec:
       containers:
         - name: backend
           # The build-image pipeline fills in the @sha256 digest after the first push.
-          image: ghcr.io/xtemplate24/notes-backend@sha256:65bb79c7d218e8407e8082b4f91732fbc7e306c52e8c5124687b10afc3b65b71
+          image: ghcr.io/xtemplate24/notes-backend
           imagePullPolicy: IfNotPresent
           env:
             - name: DB_PATH
@@ -66,9 +66,10 @@ spec:
               path: /livez
               port: api
           resources:
-            # A 50 MB upload is held in memory briefly before going to MinIO.
-            requests: { cpu: 10m, memory: 64Mi }
-            limits: { cpu: 500m, memory: 384Mi }
+            # Image uploads (up to 50 MB) are held in memory while the
+            # thumbnail is made; big photos need some room to decode.
+            requests: { cpu: 10m, memory: 96Mi }
+            limits: { cpu: "1", memory: 512Mi }
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

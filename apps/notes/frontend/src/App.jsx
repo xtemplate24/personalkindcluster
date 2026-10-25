@@ -135,6 +135,9 @@ function NoteList({ usage, onOpen }) {
   return (
     <div className="screen">
       <header className="top">
+          <a className="back" href="https://xtemplate.cc">
+            ← xtemplate.cc
+          </a>
         <div>
           <h1>Notes</h1>
           <p className="muted small">Your notes and files, stored on the home lab.</p>
@@ -174,7 +177,7 @@ function NoteList({ usage, onOpen }) {
             {col.map(({ note: n, i }) => (
               <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
                 <button className="note-card" onClick={() => onOpen(n.id)}>
-                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}`} alt="" loading="lazy" />}
+                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}/thumb`} alt="" loading="lazy" />}
                   <span className="note-text">
                     <span className="note-title">{n.title || "Untitled"}</span>
                     {previewOf(n) && <span className="note-preview">{previewOf(n)}</span>}
@@ -500,7 +503,7 @@ function Attachments({ noteId, files, setFiles, maxFile, onUsage }) {
             <li key={f.id} className="file glass" style={{ "--i": Math.min(i, 12) }}>
               <a className="thumb" href={`${API}/files/${f.id}`} target="_blank" rel="noopener noreferrer">
                 {isImage(f.type) ? (
-                  <img src={`${API}/files/${f.id}`} alt={f.name} loading="lazy" />
+                  <img src={`${API}/files/${f.id}/thumb`} alt={f.name} loading="lazy" />
                 ) : (
                   <span className="ext">{ext(f.name)}</span>
                 )}

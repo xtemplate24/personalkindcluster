@@ -1,0 +1,2314 @@
+From 4f1968f3db0f40f7620f73a00fb83d0340a73812 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 25 Oct 2026 19:48:55 +0800
+Subject: [PATCH 1/3] Add notes app (notes + attachments in MinIO) and landing
+ link
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011uSz4DGamov7QvaYAFvFhK
+---
+ .github/workflows/notes-backend.yaml          |  25 +
+ .github/workflows/notes-frontend.yaml         |  25 +
+ app-deployments/notes/backend/deployment.yaml |  87 ++++
+ app-deployments/notes/backend/pvc.yaml        |  13 +
+ app-deployments/notes/backend/service.yaml    |  12 +
+ .../notes/frontend/deployment.yaml            |  51 ++
+ app-deployments/notes/frontend/ingress.yaml   |  35 ++
+ app-deployments/notes/frontend/namespace.yaml |   6 +
+ app-deployments/notes/frontend/service.yaml   |  12 +
+ app-deployments/notes/minio/deployment.yaml   |  91 ++++
+ .../notes/minio/networkpolicy.yaml            |  20 +
+ app-deployments/notes/minio/pvc.yaml          |  12 +
+ app-deployments/notes/minio/service.yaml      |  13 +
+ apps/landing/src/App.jsx                      |   1 +
+ apps/notes/backend/.dockerignore              |   3 +
+ apps/notes/backend/Dockerfile                 |  23 +
+ apps/notes/backend/package.json               |  13 +
+ apps/notes/backend/server.js                  | 255 +++++++++
+ apps/notes/frontend/.dockerignore             |   3 +
+ apps/notes/frontend/Dockerfile                |  19 +
+ apps/notes/frontend/index.html                |  18 +
+ apps/notes/frontend/package.json              |  19 +
+ apps/notes/frontend/src/App.css               | 226 ++++++++
+ apps/notes/frontend/src/App.jsx               | 488 ++++++++++++++++++
+ apps/notes/frontend/src/index.css             | 177 +++++++
+ apps/notes/frontend/src/main.jsx              |  10 +
+ apps/notes/frontend/vite.config.js            |  20 +
+ 27 files changed, 1677 insertions(+)
+ create mode 100644 .github/workflows/notes-backend.yaml
+ create mode 100644 .github/workflows/notes-frontend.yaml
+ create mode 100644 app-deployments/notes/backend/deployment.yaml
+ create mode 100644 app-deployments/notes/backend/pvc.yaml
+ create mode 100644 app-deployments/notes/backend/service.yaml
+ create mode 100644 app-deployments/notes/frontend/deployment.yaml
+ create mode 100644 app-deployments/notes/frontend/ingress.yaml
+ create mode 100644 app-deployments/notes/frontend/namespace.yaml
+ create mode 100644 app-deployments/notes/frontend/service.yaml
+ create mode 100644 app-deployments/notes/minio/deployment.yaml
+ create mode 100644 app-deployments/notes/minio/networkpolicy.yaml
+ create mode 100644 app-deployments/notes/minio/pvc.yaml
+ create mode 100644 app-deployments/notes/minio/service.yaml
+ create mode 100644 apps/notes/backend/.dockerignore
+ create mode 100644 apps/notes/backend/Dockerfile
+ create mode 100644 apps/notes/backend/package.json
+ create mode 100644 apps/notes/backend/server.js
+ create mode 100644 apps/notes/frontend/.dockerignore
+ create mode 100644 apps/notes/frontend/Dockerfile
+ create mode 100644 apps/notes/frontend/index.html
+ create mode 100644 apps/notes/frontend/package.json
+ create mode 100644 apps/notes/frontend/src/App.css
+ create mode 100644 apps/notes/frontend/src/App.jsx
+ create mode 100644 apps/notes/frontend/src/index.css
+ create mode 100644 apps/notes/frontend/src/main.jsx
+ create mode 100644 apps/notes/frontend/vite.config.js
+
+diff --git a/.github/workflows/notes-backend.yaml b/.github/workflows/notes-backend.yaml
+new file mode 100644
+index 0000000..450f914
+--- /dev/null
++++ b/.github/workflows/notes-backend.yaml
+@@ -0,0 +1,25 @@
++name: notes-backend-build
++
++on:
++  push:
++    branches: [main]
++    paths:
++      - "apps/notes/backend/**"
++      - ".github/workflows/notes-backend.yaml"
++      - ".github/workflows/build-image.yaml"
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++jobs:
++  image:
++    permissions:
++      contents: write
++      packages: write
++    uses: ./.github/workflows/build-image.yaml
++    with:
++      name: notes-backend
++      context: apps/notes/backend
++      manifest: app-deployments/notes/backend/deployment.yaml
++      
+diff --git a/.github/workflows/notes-frontend.yaml b/.github/workflows/notes-frontend.yaml
+new file mode 100644
+index 0000000..bf7ab14
+--- /dev/null
++++ b/.github/workflows/notes-frontend.yaml
+@@ -0,0 +1,25 @@
++name: notes-frontend-build
++
++on:
++  push:
++    branches: [main]
++    paths:
++      - "apps/notes/frontend/**"
++      - ".github/workflows/notes-frontend.yaml"
++      - ".github/workflows/build-image.yaml"
++  workflow_dispatch:
++
++permissions:
++  contents: read
++
++jobs:
++  image:
++    permissions:
++      contents: write
++      packages: write
++    uses: ./.github/workflows/build-image.yaml
++    with:
++      name: notes-frontend
++      context: apps/notes/frontend
++      manifest: app-deployments/notes/frontend/deployment.yaml
++      
+diff --git a/app-deployments/notes/backend/deployment.yaml b/app-deployments/notes/backend/deployment.yaml
+new file mode 100644
+index 0000000..6fee369
+--- /dev/null
++++ b/app-deployments/notes/backend/deployment.yaml
+@@ -0,0 +1,87 @@
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: notes-backend
++  namespace: notes
++spec:
++  replicas: 1
++  # ReadWriteOnce volume + SQLite = only one pod may use it at a time,
++  # so stop the old pod before starting the new one.
++  strategy:
++    type: Recreate
++  selector:
++    matchLabels:
++      app: notes-backend
++  template:
++    metadata:
++      labels:
++        app: notes-backend
++    spec:
++      automountServiceAccountToken: false
++      securityContext:
++        runAsNonRoot: true
++        runAsUser: 101
++        fsGroup: 101
++        seccompProfile:
++          type: RuntimeDefault
++      containers:
++        - name: backend
++          # The build-image pipeline fills in the @sha256 digest after the first push.
++          image: ghcr.io/xtemplate24/notes-backend
++          imagePullPolicy: IfNotPresent
++          env:
++            - name: DB_PATH
++              value: /data/notes.db
++            - name: MINIO_HOST
++              value: notes-minio-svc
++            - name: MINIO_PORT
++              value: "9000"
++            - name: MINIO_BUCKET
++              value: notes
++            - name: MAX_FILE_MB      # per file
++              value: "50"
++            - name: QUOTA_MB         # all files per user (local-path volumes have no size limit of their own)
++              value: "20480"
++            # Same secret MinIO uses, created by hand (never in git), see minio/deployment.yaml
++            - name: MINIO_ACCESS_KEY
++              valueFrom:
++                secretKeyRef:
++                  name: notes-minio
++                  key: root-user
++            - name: MINIO_SECRET_KEY
++              valueFrom:
++                secretKeyRef:
++                  name: notes-minio
++                  key: root-password
++          ports:
++            - containerPort: 8080
++              name: api
++          # /healthz only says "ready" once MinIO answers and the bucket exists.
++          readinessProbe:
++            httpGet:
++              path: /healthz
++              port: api
++          livenessProbe:
++            httpGet:
++              path: /livez
++              port: api
++          resources:
++            # A 50 MB upload is held in memory briefly before going to MinIO.
++            requests: { cpu: 10m, memory: 64Mi }
++            limits: { cpu: 500m, memory: 384Mi }
++          securityContext:
++            allowPrivilegeEscalation: false
++            capabilities:
++              drop: ["ALL"]
++            readOnlyRootFilesystem: true
++          volumeMounts:
++            - mountPath: /data
++              name: data
++            - mountPath: /tmp
++              name: tmp
++      volumes:
++        - name: data
++          persistentVolumeClaim:
++            claimName: notes-db
++        - emptyDir: {}
++          name: tmp
+diff --git a/app-deployments/notes/backend/pvc.yaml b/app-deployments/notes/backend/pvc.yaml
+new file mode 100644
+index 0000000..8a83639
+--- /dev/null
++++ b/app-deployments/notes/backend/pvc.yaml
+@@ -0,0 +1,13 @@
++# Holds the SQLite database (note text + file list). Small.
++# k3s's built-in "local-path" storage class creates it under
++# /var/lib/rancher/k3s/storage on the EliteDesk's NVMe.
++apiVersion: v1
++kind: PersistentVolumeClaim
++metadata:
++  name: notes-db
++  namespace: notes
++spec:
++  accessModes: ["ReadWriteOnce"]
++  resources:
++    requests:
++      storage: 1Gi
+diff --git a/app-deployments/notes/backend/service.yaml b/app-deployments/notes/backend/service.yaml
+new file mode 100644
+index 0000000..f2927c2
+--- /dev/null
++++ b/app-deployments/notes/backend/service.yaml
+@@ -0,0 +1,12 @@
++apiVersion: v1
++kind: Service
++metadata:
++  name: notes-backend-svc
++  namespace: notes
++spec:
++  selector:
++    app: notes-backend
++  ports:
++    - name: api
++      port: 8080
++      targetPort: api
+diff --git a/app-deployments/notes/frontend/deployment.yaml b/app-deployments/notes/frontend/deployment.yaml
+new file mode 100644
+index 0000000..f266bc9
+--- /dev/null
++++ b/app-deployments/notes/frontend/deployment.yaml
+@@ -0,0 +1,51 @@
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: notes-frontend
++  namespace: notes
++spec:
++  replicas: 1
++  selector:
++    matchLabels:
++      app: notes-frontend
++  template:
++    metadata:
++      labels:
++        app: notes-frontend
++    spec:
++      automountServiceAccountToken: false
++      securityContext:
++        runAsNonRoot: true
++        runAsUser: 101
++        seccompProfile:
++          type: RuntimeDefault
++      containers:
++        - name: nginx
++          # The build-image pipeline fills in the @sha256 digest after the first push.
++          image: ghcr.io/xtemplate24/notes-frontend
++          imagePullPolicy: IfNotPresent
++          ports:
++            - containerPort: 8080
++              name: http
++          readinessProbe:
++            httpGet:
++              path: /
++              port: http
++          livenessProbe:
++            httpGet:
++              path: /
++              port: http
++          resources:
++            requests: { cpu: 10m, memory: 16Mi }
++            limits: { cpu: 100m, memory: 64Mi }
++          securityContext:
++            allowPrivilegeEscalation: false
++            capabilities:
++              drop: ["ALL"]
++            readOnlyRootFilesystem: true
++          volumeMounts:
++            - mountPath: /tmp
++              name: tmp
++      volumes:
++        - emptyDir: {}
++          name: tmp
+diff --git a/app-deployments/notes/frontend/ingress.yaml b/app-deployments/notes/frontend/ingress.yaml
+new file mode 100644
+index 0000000..938efb3
+--- /dev/null
++++ b/app-deployments/notes/frontend/ingress.yaml
+@@ -0,0 +1,35 @@
++apiVersion: networking.k8s.io/v1
++kind: Ingress
++metadata:
++  name: notes-ingress
++  namespace: notes
++  annotations:
++    traefik.ingress.kubernetes.io/router.entrypoints: websecure
++    traefik.ingress.kubernetes.io/router.tls: "true"
++    traefik.ingress.kubernetes.io/router.middlewares: >-
++      auth-oauth2-proxy-errors@kubernetescrd,
++      auth-oauth2-proxy-auth@kubernetescrd
++spec:
++  ingressClassName: traefik
++  tls:
++    - hosts:
++        - notes.xtemplate.cc
++  rules:
++    - host: notes.xtemplate.cc
++      http:
++        paths:
++          # /api (incl. uploads) goes straight to the backend, never through nginx.
++          - path: /api
++            pathType: Prefix
++            backend:
++              service:
++                name: notes-backend-svc
++                port:
++                  name: api
++          - path: /
++            pathType: Prefix
++            backend:
++              service:
++                name: notes-frontend-svc
++                port:
++                  name: http
+diff --git a/app-deployments/notes/frontend/namespace.yaml b/app-deployments/notes/frontend/namespace.yaml
+new file mode 100644
+index 0000000..b46ef40
+--- /dev/null
++++ b/app-deployments/notes/frontend/namespace.yaml
+@@ -0,0 +1,6 @@
++apiVersion: v1
++kind: Namespace
++metadata:
++  labels:
++    pod-security.kubernetes.io/enforce: restricted
++  name: notes
+diff --git a/app-deployments/notes/frontend/service.yaml b/app-deployments/notes/frontend/service.yaml
+new file mode 100644
+index 0000000..f8ae2ac
+--- /dev/null
++++ b/app-deployments/notes/frontend/service.yaml
+@@ -0,0 +1,12 @@
++apiVersion: v1
++kind: Service
++metadata:
++  name: notes-frontend-svc
++  namespace: notes
++spec:
++  selector:
++    app: notes-frontend
++  ports:
++    - name: http
++      port: 80
++      targetPort: http
+diff --git a/app-deployments/notes/minio/deployment.yaml b/app-deployments/notes/minio/deployment.yaml
+new file mode 100644
+index 0000000..9988de0
+--- /dev/null
++++ b/app-deployments/notes/minio/deployment.yaml
+@@ -0,0 +1,91 @@
++# MinIO = self-hosted S3 object storage for the attachments.
++#
++# The official minio/minio images are no longer published, so this uses
++# Chainguard's maintained build (small, non-root, regularly patched).
++#
++# Login details, created by hand once (never in git):
++#   kubectl create secret generic notes-minio -n notes \
++#     --from-literal=root-user=notesadmin \
++#     --from-literal=root-password="$(openssl rand -base64 24)"
++apiVersion: apps/v1
++kind: Deployment
++metadata:
++  name: notes-minio
++  namespace: notes
++spec:
++  replicas: 1
++  strategy:
++    type: Recreate   # ReadWriteOnce volume: one pod at a time
++  selector:
++    matchLabels:
++      app: notes-minio
++  template:
++    metadata:
++      labels:
++        app: notes-minio
++    spec:
++      automountServiceAccountToken: false
++      securityContext:
++        runAsNonRoot: true
++        runAsUser: 65532
++        runAsGroup: 65532
++        fsGroup: 65532
++        seccompProfile:
++          type: RuntimeDefault
++      containers:
++        - name: minio
++          # Chainguard's free tier only publishes "latest". Pin it to a digest
++          # (see the setup steps) so Argo doesn't silently change versions.
++          image: cgr.dev/chainguard/minio:latest
++          imagePullPolicy: IfNotPresent
++          args:
++            - server
++            - /data
++            - --address=:9000
++            - --certs-dir=/tmp/certs   # root filesystem is read-only
++          env:
++            - name: HOME
++              value: /tmp
++            - name: MINIO_BROWSER        # no web console; nothing exposes it anyway
++              value: "off"
++            - name: MINIO_ROOT_USER
++              valueFrom:
++                secretKeyRef:
++                  name: notes-minio
++                  key: root-user
++            - name: MINIO_ROOT_PASSWORD
++              valueFrom:
++                secretKeyRef:
++                  name: notes-minio
++                  key: root-password
++          ports:
++            - containerPort: 9000
++              name: s3
++          readinessProbe:
++            httpGet:
++              path: /minio/health/ready
++              port: s3
++          livenessProbe:
++            httpGet:
++              path: /minio/health/live
++              port: s3
++            initialDelaySeconds: 10
++          resources:
++            requests: { cpu: 50m, memory: 128Mi }
++            limits: { cpu: "1", memory: 1Gi }
++          securityContext:
++            allowPrivilegeEscalation: false
++            capabilities:
++              drop: ["ALL"]
++            readOnlyRootFilesystem: true
++          volumeMounts:
++            - mountPath: /data
++              name: data
++            - mountPath: /tmp
++              name: tmp
++      volumes:
++        - name: data
++          persistentVolumeClaim:
++            claimName: notes-files
++        - emptyDir: {}
++          name: tmp
+diff --git a/app-deployments/notes/minio/networkpolicy.yaml b/app-deployments/notes/minio/networkpolicy.yaml
+new file mode 100644
+index 0000000..059ef07
+--- /dev/null
++++ b/app-deployments/notes/minio/networkpolicy.yaml
+@@ -0,0 +1,20 @@
++# Only the notes backend may talk to MinIO. Any other pod in the cluster
++# (or anything that sneaks in) is refused. k3s enforces NetworkPolicy out of the box.
++apiVersion: networking.k8s.io/v1
++kind: NetworkPolicy
++metadata:
++  name: minio-only-from-backend
++  namespace: notes
++spec:
++  podSelector:
++    matchLabels:
++      app: notes-minio
++  policyTypes: ["Ingress"]
++  ingress:
++    - from:
++        - podSelector:
++            matchLabels:
++              app: notes-backend
++      ports:
++        - protocol: TCP
++          port: 9000
+diff --git a/app-deployments/notes/minio/pvc.yaml b/app-deployments/notes/minio/pvc.yaml
+new file mode 100644
+index 0000000..e48cd82
+--- /dev/null
++++ b/app-deployments/notes/minio/pvc.yaml
+@@ -0,0 +1,12 @@
++# Holds the uploaded files. local-path does NOT enforce this size (it's just
++# a folder on the NVMe), so the real limit is QUOTA_MB in the backend.
++apiVersion: v1
++kind: PersistentVolumeClaim
++metadata:
++  name: notes-files
++  namespace: notes
++spec:
++  accessModes: ["ReadWriteOnce"]
++  resources:
++    requests:
++      storage: 20Gi
+diff --git a/app-deployments/notes/minio/service.yaml b/app-deployments/notes/minio/service.yaml
+new file mode 100644
+index 0000000..fd2d03a
+--- /dev/null
++++ b/app-deployments/notes/minio/service.yaml
+@@ -0,0 +1,13 @@
++apiVersion: v1
++kind: Service
++metadata:
++  name: notes-minio-svc
++  namespace: notes
++spec:
++  # ClusterIP (internal only). No ingress points here.
++  selector:
++    app: notes-minio
++  ports:
++    - name: s3
++      port: 9000
++      targetPort: s3
+diff --git a/apps/landing/src/App.jsx b/apps/landing/src/App.jsx
+index 45f7808..2feadf9 100644
+--- a/apps/landing/src/App.jsx
++++ b/apps/landing/src/App.jsx
+@@ -9,6 +9,7 @@ const pub_apps = [
+ const priv_apps = [
+   { name: "Local LLM", url: "https://app2.xtemplate.cc", label: "app2.xtemplate.cc" },
+   { name: "Workout tracker", url: "https://app3.xtemplate.cc", label: "app3.xtemplate.cc" },
++  { name: "Notes & files", url: "https://notes.xtemplate.cc", label: "notes.xtemplate.cc" },
+ ];
+ 
+ const admin_links = [
+diff --git a/apps/notes/backend/.dockerignore b/apps/notes/backend/.dockerignore
+new file mode 100644
+index 0000000..d782664
+--- /dev/null
++++ b/apps/notes/backend/.dockerignore
+@@ -0,0 +1,3 @@
++node_modules
++.git
++*.db*
+diff --git a/apps/notes/backend/Dockerfile b/apps/notes/backend/Dockerfile
+new file mode 100644
+index 0000000..d8c7714
+--- /dev/null
++++ b/apps/notes/backend/Dockerfile
+@@ -0,0 +1,23 @@
++# Node 22 for the built-in node:sqlite module (same as app3-backend).
++FROM node:22-alpine
++
++WORKDIR /app
++
++# Pull latest security patches for the OS-layer openssl libs.
++RUN apk update && apk upgrade libssl3 libcrypto3
++
++# Uses the lockfile if it exists (run the create-lockfile workflow once for
++# apps/notes/backend to add it); falls back to npm install until then.
++# Then remove the npm CLI itself: we only run `node server.js` at runtime,
++# and npm's own bundled dependencies are what Trivy flags.
++COPY package*.json ./
++RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit=dev; fi \
++    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
++
++COPY server.js ./
++
++# Matches notes-backend's Deployment: runAsUser 101, containerPort 8080.
++USER 101
++EXPOSE 8080
++
++CMD ["node", "server.js"]
+diff --git a/apps/notes/backend/package.json b/apps/notes/backend/package.json
+new file mode 100644
+index 0000000..a4b87ee
+--- /dev/null
++++ b/apps/notes/backend/package.json
+@@ -0,0 +1,13 @@
++{
++  "name": "notes-backend",
++  "private": true,
++  "version": "0.0.0",
++  "type": "module",
++  "main": "server.js",
++  "scripts": {
++    "start": "node server.js"
++  },
++  "dependencies": {
++    "minio": "^8.0.5"
++  }
++}
+diff --git a/apps/notes/backend/server.js b/apps/notes/backend/server.js
+new file mode 100644
+index 0000000..ead3d6e
+--- /dev/null
++++ b/apps/notes/backend/server.js
+@@ -0,0 +1,255 @@
++// notes-backend: notes in SQLite (on a PersistentVolume), attachments in MinIO.
++// Same shape as app3-backend: plain node:http, the signed-in GitHub user comes
++// from the X-Auth-Request-User header that oauth2-proxy adds via Traefik.
++import http from "node:http";
++import { randomUUID } from "node:crypto";
++import { DatabaseSync } from "node:sqlite";
++import * as Minio from "minio";
++
++const PORT = Number(process.env.PORT || 8080);
++const MB = 1024 * 1024;
++const MAX_FILE = Number(process.env.MAX_FILE_MB || 50) * MB;    // per upload
++const QUOTA = Number(process.env.QUOTA_MB || 10240) * MB;       // per user, all files
++const BUCKET = process.env.MINIO_BUCKET || "notes";
++
++// ---------- MinIO (S3) client ----------
++// MinIO runs in the same namespace; only this pod may reach it (NetworkPolicy).
++const s3 = new Minio.Client({
++  endPoint: process.env.MINIO_HOST || "notes-minio-svc",
++  port: Number(process.env.MINIO_PORT || 9000),
++  useSSL: false,
++  accessKey: process.env.MINIO_ACCESS_KEY,
++  secretKey: process.env.MINIO_SECRET_KEY,
++});
++
++let ready = false; // flips to true once the bucket exists
++async function ensureBucket() {
++  for (;;) {
++    try {
++      if (!(await s3.bucketExists(BUCKET))) await s3.makeBucket(BUCKET);
++      ready = true;
++      console.log(`bucket "${BUCKET}" ready`);
++      return;
++    } catch (err) {
++      console.log(`waiting for MinIO: ${err.code || err.message}`);
++      await new Promise((r) => setTimeout(r, 3000));
++    }
++  }
++}
++ensureBucket();
++
++// ---------- SQLite ----------
++const db = new DatabaseSync(process.env.DB_PATH || "/data/notes.db");
++db.exec(`
++  PRAGMA journal_mode = WAL;
++  PRAGMA foreign_keys = ON;
++  CREATE TABLE IF NOT EXISTS notes (
++    id TEXT PRIMARY KEY, user TEXT NOT NULL,
++    title TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '',
++    created TEXT NOT NULL, updated TEXT NOT NULL
++  );
++  CREATE INDEX IF NOT EXISTS notes_user ON notes (user, updated);
++  -- One row per attachment. The bytes live in MinIO under "key".
++  CREATE TABLE IF NOT EXISTS files (
++    id TEXT PRIMARY KEY,
++    note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
++    user TEXT NOT NULL, key TEXT NOT NULL,
++    name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created TEXT NOT NULL
++  );
++  CREATE INDEX IF NOT EXISTS files_note ON files (note_id);
++  CREATE INDEX IF NOT EXISTS files_user ON files (user);
++`);
++
++const q = {
++  list: db.prepare(`
++    SELECT n.id, n.title, substr(n.body, 1, 160) AS preview, n.updated,
++           (SELECT COUNT(*) FROM files f WHERE f.note_id = n.id) AS files
++    FROM notes n WHERE n.user = ? ORDER BY n.updated DESC`),
++  get: db.prepare("SELECT id, title, body, created, updated FROM notes WHERE id = ? AND user = ?"),
++  add: db.prepare("INSERT INTO notes (id, user, title, body, created, updated) VALUES (?, ?, ?, ?, ?, ?)"),
++  save: db.prepare("UPDATE notes SET title = ?, body = ?, updated = ? WHERE id = ? AND user = ?"),
++  touch: db.prepare("UPDATE notes SET updated = ? WHERE id = ?"),
++  del: db.prepare("DELETE FROM notes WHERE id = ? AND user = ?"),
++  files: db.prepare("SELECT id, name, type, size, created FROM files WHERE note_id = ? ORDER BY created"),
++  fileKeys: db.prepare("SELECT key FROM files WHERE note_id = ?"),
++  file: db.prepare("SELECT id, note_id, key, name, type, size FROM files WHERE id = ? AND user = ?"),
++  addFile: db.prepare(
++    "INSERT INTO files (id, note_id, user, key, name, type, size, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
++  ),
++  delFile: db.prepare("DELETE FROM files WHERE id = ?"),
++  used: db.prepare("SELECT COALESCE(SUM(size), 0) AS used FROM files WHERE user = ?"),
++};
++
++// ---------- helpers ----------
++const now = () => new Date().toISOString();
++const ID = "[0-9a-f-]{36}";
++
++const json = (res, code, body) => {
++  res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" });
++  res.end(JSON.stringify(body));
++};
++
++const readJson = (req, limit = 300_000) =>
++  new Promise((resolve, reject) => {
++    let data = "";
++    req.setEncoding("utf8");
++    req.on("data", (c) => {
++      data += c;
++      if (data.length > limit) { reject(Object.assign(new Error("note too large"), { status: 413 })); req.destroy(); }
++    });
++    req.on("end", () => { try { resolve(JSON.parse(data || "{}")); } catch { reject(Object.assign(new Error("bad JSON"), { status: 400 })); } });
++    req.on("error", reject);
++  });
++
++// Note text limits: generous, but stops someone filling the DB by accident.
++function cleanNote(b) {
++  const title = String(b.title ?? "").slice(0, 200);
++  const body = String(b.body ?? "");
++  if (body.length > 200_000) throw Object.assign(new Error("note text is limited to 200,000 characters"), { status: 413 });
++  return { title, body };
++}
++
++// Turn whatever the browser sent into a safe display name.
++function cleanName(raw) {
++  let name = "file";
++  try { name = decodeURIComponent(String(raw || "file")); } catch { /* keep default */ }
++  name = name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").trim().slice(0, 200);
++  return name || "file";
++}
++
++// Only these are ever shown inline in the browser. Everything else (HTML, SVG,
++// PDF, ...) is sent as a download so an uploaded file can never run script on
++// notes.xtemplate.cc.
++const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
++
++const contentDisposition = (kind, name) =>
++  `${kind}; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`;
++
++// ---------- routes ----------
++async function handle(req, res, user, p) {
++  let m;
++
++  // usage bar in the UI
++  if (req.method === "GET" && p === "/api/usage") {
++    return json(res, 200, { used: q.used.get(user).used, quota: QUOTA, maxFile: MAX_FILE });
++  }
++
++  // list + create notes
++  if (p === "/api/notes") {
++    if (req.method === "GET") return json(res, 200, q.list.all(user));
++    if (req.method === "POST") {
++      const { title, body } = cleanNote(await readJson(req));
++      const id = randomUUID();
++      const t = now();
++      q.add.run(id, user, title, body, t, t);
++      return json(res, 201, { id, title, body, created: t, updated: t, files: [] });
++    }
++  }
++
++  // one note
++  if ((m = p.match(new RegExp(`^/api/notes/(${ID})$`)))) {
++    const note = q.get.get(m[1], user);
++    if (!note) return json(res, 404, { error: "note not found" });
++
++    if (req.method === "GET") return json(res, 200, { ...note, files: q.files.all(note.id) });
++
++    if (req.method === "PUT") {
++      const { title, body } = cleanNote(await readJson(req));
++      const t = now();
++      q.save.run(title, body, t, note.id, user);
++      return json(res, 200, { ok: true, updated: t });
++    }
++
++    if (req.method === "DELETE") {
++      const keys = q.fileKeys.all(note.id).map((r) => r.key);
++      if (keys.length) await s3.removeObjects(BUCKET, keys);
++      q.del.run(note.id, user); // files rows go too (ON DELETE CASCADE)
++      return json(res, 200, { ok: true });
++    }
++  }
++
++  // upload an attachment: the raw file is the request body (no multipart),
++  // name in X-File-Name, type in Content-Type. Streamed straight to MinIO.
++  if (req.method === "POST" && (m = p.match(new RegExp(`^/api/notes/(${ID})/files$`)))) {
++    const note = q.get.get(m[1], user);
++    if (!note) return json(res, 404, { error: "note not found" });
++
++    const size = Number(req.headers["content-length"]);
++    if (!Number.isInteger(size) || size <= 0) return json(res, 411, { error: "missing file size" });
++    if (size > MAX_FILE) return json(res, 413, { error: `files are limited to ${MAX_FILE / MB} MB` });
++    if (q.used.get(user).used + size > QUOTA) return json(res, 413, { error: "storage quota reached" });
++
++    const id = randomUUID();
++    const key = `u/${encodeURIComponent(user)}/${id}`;
++    const name = cleanName(req.headers["x-file-name"]);
++    const type = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim().slice(0, 100)
++      || "application/octet-stream";
++
++    try {
++      await s3.putObject(BUCKET, key, req, size, { "Content-Type": type });
++    } catch (err) {
++      console.error("upload failed:", err.message);
++      return json(res, 400, { error: "upload interrupted" });
++    }
++    const t = now();
++    q.addFile.run(id, note.id, user, key, name, type, size, t);
++    q.touch.run(t, note.id);
++    return json(res, 201, { id, name, type, size, created: t });
++  }
++
++  // download / view or delete an attachment
++  if ((m = p.match(new RegExp(`^/api/files/(${ID})$`)))) {
++    const f = q.file.get(m[1], user);
++    if (!f) return json(res, 404, { error: "file not found" });
++
++    if (req.method === "GET") {
++      const download = new URL(req.url, "http://x").searchParams.has("download");
++      const inline = !download && INLINE_TYPES.has(f.type);
++      const stream = await s3.getObject(BUCKET, f.key);
++      res.writeHead(200, {
++        "Content-Type": inline ? f.type : "application/octet-stream",
++        "Content-Length": f.size,
++        "Content-Disposition": contentDisposition(inline ? "inline" : "attachment", f.name),
++        "X-Content-Type-Options": "nosniff",
++        "Content-Security-Policy": "default-src 'none'; img-src 'self'; sandbox",
++        "Cache-Control": "private, max-age=86400",
++      });
++      stream.on("error", (err) => { console.error("download failed:", err.message); res.destroy(); });
++      return stream.pipe(res);
++    }
++
++    if (req.method === "DELETE") {
++      await s3.removeObject(BUCKET, f.key);
++      q.delFile.run(f.id);
++      q.touch.run(now(), f.note_id);
++      return json(res, 200, { ok: true });
++    }
++  }
++
++  return json(res, 404, { error: "not found" });
++}
++
++http
++  .createServer(async (req, res) => {
++    const p = new URL(req.url, "http://x").pathname;
++    try {
++      if (p === "/livez") { res.writeHead(200); return res.end("ok"); }
++      if (p === "/healthz") { res.writeHead(ready ? 200 : 503); return res.end(ready ? "ok" : "waiting for minio"); }
++
++      if (p.startsWith("/api/")) {
++        // oauth2-proxy (via Traefik forwardAuth) sets this to the GitHub username.
++        const user = req.headers["x-auth-request-user"];
++        if (!user) return json(res, 401, { error: "not signed in" });
++        if (!ready) return json(res, 503, { error: "storage is starting, try again shortly" });
++        return await handle(req, res, user, p);
++      }
++      json(res, 404, { error: "not found" });
++    } catch (err) {
++      console.error(err);
++      if (!res.headersSent) json(res, err.status || 500, { error: err.status ? err.message : "internal error" });
++      else res.destroy();
++    }
++  })
++  // Uploads can take a while on a slow connection; don't cut them off early.
++  .setTimeout(10 * 60 * 1000)
++  .listen(PORT, () => console.log(`notes-backend listening on ${PORT}`));
+diff --git a/apps/notes/frontend/.dockerignore b/apps/notes/frontend/.dockerignore
+new file mode 100644
+index 0000000..a21f178
+--- /dev/null
++++ b/apps/notes/frontend/.dockerignore
+@@ -0,0 +1,3 @@
++node_modules
++dist
++.git
+diff --git a/apps/notes/frontend/Dockerfile b/apps/notes/frontend/Dockerfile
+new file mode 100644
+index 0000000..bbd842d
+--- /dev/null
++++ b/apps/notes/frontend/Dockerfile
+@@ -0,0 +1,19 @@
++# Build stage: compile React to static files
++FROM node:22-alpine AS build
++WORKDIR /app
++COPY package*.json ./
++# Uses the lockfile if it exists (run the create-lockfile workflow once for
++# apps/notes/frontend to add it); falls back to npm install until then.
++RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
++COPY . .
++RUN npm run build
++
++# Serve stage: plain nginx, runs as UID 101 on port 8080 (same as app3).
++# Uploads never pass through here: the ingress sends /api straight to the
++# backend, so nginx's 1 MB body limit doesn't apply.
++FROM nginxinc/nginx-unprivileged:stable-alpine
++USER root
++RUN apk update && apk upgrade libexpat
++USER 101
++COPY --chown=101:101 --from=build /app/dist /usr/share/nginx/html
++EXPOSE 8080
+diff --git a/apps/notes/frontend/index.html b/apps/notes/frontend/index.html
+new file mode 100644
+index 0000000..bfc4d57
+--- /dev/null
++++ b/apps/notes/frontend/index.html
+@@ -0,0 +1,18 @@
++<!doctype html>
++<html lang="en">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1" />
++    <title>Notes</title>
++    <link rel="preconnect" href="https://fonts.googleapis.com" />
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
++    <link
++      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap"
++      rel="stylesheet"
++    />
++  </head>
++  <body>
++    <div id="root"></div>
++    <script type="module" src="/src/main.jsx"></script>
++  </body>
++</html>
+diff --git a/apps/notes/frontend/package.json b/apps/notes/frontend/package.json
+new file mode 100644
+index 0000000..fd4d435
+--- /dev/null
++++ b/apps/notes/frontend/package.json
+@@ -0,0 +1,19 @@
++{
++  "name": "notes-frontend",
++  "private": true,
++  "version": "0.0.0",
++  "type": "module",
++  "scripts": {
++    "dev": "vite",
++    "build": "vite build",
++    "preview": "vite preview"
++  },
++  "dependencies": {
++    "react": "^18.3.1",
++    "react-dom": "^18.3.1"
++  },
++  "devDependencies": {
++    "@vitejs/plugin-react": "^4.3.1",
++    "vite": "^5.4.0"
++  }
++}
+diff --git a/apps/notes/frontend/src/App.css b/apps/notes/frontend/src/App.css
+new file mode 100644
+index 0000000..6d6fccc
+--- /dev/null
++++ b/apps/notes/frontend/src/App.css
+@@ -0,0 +1,226 @@
++/* Colours, glass recipe and the aurora background live in index.css (:root). */
++
++.page { max-width: 760px; margin: 0 auto; padding: clamp(20px, 5vw, 56px) 16px 72px; }
++
++h1, h2 { font-family: "Space Grotesk", sans-serif; }
++h1 { font-size: clamp(1.7rem, 4vw, 2.2rem); font-weight: 600; margin: 0 0 4px; color: var(--text-strong); letter-spacing: -0.01em; }
++h2 { display: flex; align-items: center; gap: 8px; font-size: 1.05rem; font-weight: 500; margin: 32px 0 12px; color: var(--text-soft); }
++.muted { color: var(--muted); }
++.small { font-size: 0.85rem; }
++.mono { font-family: "IBM Plex Mono", monospace; }
++.center { text-align: center; }
++.error { color: var(--danger); }
++p { margin: 0; }
++
++/* ---------- motion ---------- */
++@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
++@keyframes pop { 0% { opacity: 0; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
++@keyframes spin { to { transform: rotate(360deg); } }
++@keyframes shimmer { from { background-position: 0 0; } to { background-position: 40px 0; } }
++
++.screen { animation: fadeUp 0.35s ease-out both; }
++.pop { animation: pop 0.25s ease-out both; }
++.spinner { width: 34px; height: 34px; margin: 80px auto; border: 3px solid rgba(var(--white-rgb), 0.12); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
++
++/* ---------- glass surfaces ---------- */
++.glass, .note-card {
++  background: var(--glass-bg);
++  border: var(--glass-border);
++  border-radius: var(--panel-radius);
++  box-shadow: var(--glass-shadow);
++  -webkit-backdrop-filter: var(--glass-blur);
++  backdrop-filter: var(--glass-blur);
++}
++
++/* ---------- buttons: glass pills (same as app3) ---------- */
++button, input, textarea { font-family: inherit; }
++
++button, .icon-btn {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 8px;
++  font-size: 0.95rem;
++  padding: 10px 18px;
++  color: var(--text);
++  background: var(--glass-bg);
++  border: var(--glass-border);
++  border-radius: var(--btn-radius);
++  box-shadow: var(--glass-shadow);
++  -webkit-backdrop-filter: var(--glass-blur);
++  backdrop-filter: var(--glass-blur);
++  cursor: pointer;
++  text-decoration: none;
++  transition: transform 0.15s, border-color 0.2s, box-shadow 0.2s, background 0.2s, color 0.2s, opacity 0.2s;
++}
++button:hover:not(:disabled), .icon-btn:hover { transform: translateY(-2px); background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
++button:active:not(:disabled), .icon-btn:active { transform: scale(0.97); }
++button:disabled { opacity: 0.4; cursor: default; }
++button:focus-visible, .icon-btn:focus-visible, a:focus-visible, .drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
++
++button.primary {
++  background: var(--accent-grad);
++  color: var(--on-accent);
++  border: 1px solid rgba(var(--white-rgb), 0.35);
++  font-weight: 600;
++  font-family: "Space Grotesk", sans-serif;
++  box-shadow: inset 0 1px 0 rgba(var(--white-rgb), 0.5), 0 8px 24px rgba(var(--accent-rgb), 0.25);
++}
++button.primary:hover:not(:disabled) {
++  background: var(--accent-grad-hover);
++  box-shadow: inset 0 1px 0 rgba(var(--white-rgb), 0.5), 0 10px 28px rgba(var(--accent-rgb), 0.4);
++}
++
++button.danger { background: var(--danger-solid); color: var(--on-danger); border-color: rgba(var(--white-rgb), 0.25); }
++button.danger:hover:not(:disabled) { background: var(--danger-solid-hover); }
++
++/* text-only buttons */
++button.ghost {
++  background: none; border-color: transparent; box-shadow: none;
++  -webkit-backdrop-filter: none; backdrop-filter: none;
++  color: var(--muted); padding: 8px 12px;
++}
++button.ghost:hover:not(:disabled) { color: var(--text); background: rgba(var(--white-rgb), 0.06); border-color: transparent; transform: none; }
++button.ghost.danger-text:hover:not(:disabled) { color: var(--danger); }
++button.back { margin-left: -12px; }
++
++.icon-btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; color: var(--text-soft); }
++.small-btn { padding: 6px 12px; font-size: 0.85rem; }
++
++/* ---------- inputs ---------- */
++input {
++  flex: 1;
++  min-width: 0;
++  padding: 12px 16px;
++  font-size: 1rem;
++  color: var(--text);
++  background: rgba(var(--white-rgb), 0.05);
++  border: var(--glass-border);
++  border-radius: var(--field-radius);
++  box-shadow: inset 0 2px 6px rgba(var(--black-rgb), 0.3);
++  transition: border-color 0.2s, box-shadow 0.2s;
++}
++input:focus { outline: none; border-color: var(--accent); box-shadow: inset 0 2px 6px rgba(var(--black-rgb), 0.3), 0 0 0 3px rgba(var(--accent-rgb), 0.2); }
++input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
++
++/* ---------- list screen ---------- */
++.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
++
++.usage { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
++.usage .track { flex: 1; }
++.track { background: rgba(var(--white-rgb), 0.08); border-radius: 999px; height: 8px; overflow: hidden; box-shadow: inset 0 1px 3px rgba(var(--black-rgb), 0.4); }
++.fill { height: 100%; border-radius: 999px; background: var(--accent-grad); transition: width 0.3s ease; }
++.fill.live {
++  background-image: repeating-linear-gradient(-45deg, rgba(var(--white-rgb), 0.25) 0 10px, transparent 10px 20px), var(--accent-grad);
++  background-size: 40px 100%, 100% 100%;
++  animation: shimmer 0.8s linear infinite;
++}
++
++.search { position: relative; display: flex; align-items: center; color: var(--muted); }
++.search svg { position: absolute; left: 16px; pointer-events: none; }
++.search input { padding-left: 44px; }
++
++.list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 10px; }
++.list li { animation: fadeUp 0.4s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }
++
++.note-card {
++  width: 100%;
++  display: flex;
++  flex-direction: column;
++  align-items: stretch;
++  gap: 6px;
++  padding: 16px 20px;
++  text-align: left;
++}
++.note-card:hover:not(:disabled) { border-color: var(--glass-border-hover); }
++.note-title { font-family: "Space Grotesk", sans-serif; font-size: 1.1rem; font-weight: 500; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.note-preview {
++  color: var(--text-soft); font-size: 0.9rem; line-height: 1.45;
++  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
++}
++.note-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; font-family: "IBM Plex Mono", monospace; }
++.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
++
++.empty { text-align: center; padding: 40px 20px; margin-top: 16px; display: grid; gap: 6px; }
++
++/* ---------- editor ---------- */
++.editor-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
++.save-state { font-family: "IBM Plex Mono", monospace; font-size: 0.8rem; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
++.save-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 8px var(--teal); }
++.save-state.dirty::before, .save-state.saving::before { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
++.save-state.error { color: var(--danger); }
++.save-state.error::before { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
++
++.sheet { padding: 22px clamp(18px, 4vw, 30px) 26px; }
++.title-input, .body-input {
++  width: 100%;
++  background: none;
++  border: 0;
++  box-shadow: none;
++  padding: 0;
++  color: var(--text);
++  border-radius: 0;
++}
++.title-input { font-family: "Space Grotesk", sans-serif; font-size: clamp(1.4rem, 3.5vw, 1.8rem); font-weight: 600; color: var(--text-strong); margin-bottom: 14px; }
++.title-input:focus { box-shadow: none; }
++.body-input {
++  display: block;
++  min-height: 40vh;
++  resize: none;
++  overflow: hidden;
++  font-size: 1rem;
++  line-height: 1.65;
++}
++.body-input:focus { outline: none; }
++
++/* ---------- attachments ---------- */
++.drop {
++  display: grid;
++  justify-items: center;
++  gap: 4px;
++  padding: 22px 16px;
++  text-align: center;
++  color: var(--text-soft);
++  border: 1.5px dashed rgba(var(--white-rgb), 0.22);
++  border-radius: var(--panel-radius);
++  background: rgba(var(--white-rgb), 0.03);
++  cursor: pointer;
++  transition: border-color 0.2s, background 0.2s, color 0.2s;
++}
++.drop:hover { border-color: rgba(var(--white-rgb), 0.35); color: var(--text); }
++.drop.over { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.08); color: var(--accent); }
++.drop svg { color: var(--accent); margin-bottom: 4px; }
++
++.uploads { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
++.uploads li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 1.2fr) auto; align-items: center; gap: 12px; font-size: 0.9rem; }
++.uploads li.failed { grid-template-columns: minmax(0, 1fr) auto auto; }
++.up-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++
++.files { list-style: none; padding: 0; margin: 14px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
++.file { display: flex; flex-direction: column; overflow: hidden; animation: fadeUp 0.4s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }
++.thumb {
++  display: grid;
++  place-items: center;
++  aspect-ratio: 16 / 10;
++  background: rgba(var(--black-rgb), 0.25);
++  border-bottom: 1px solid rgba(var(--white-rgb), 0.08);
++  overflow: hidden;
++  text-decoration: none;
++}
++.thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
++.thumb:hover img { transform: scale(1.04); }
++.ext { font-family: "IBM Plex Mono", monospace; font-size: 1.1rem; font-weight: 500; color: var(--accent); letter-spacing: 0.06em; padding: 10px 14px; border: 1px solid rgba(var(--accent-rgb), 0.35); border-radius: 12px; background: rgba(var(--accent-rgb), 0.06); }
++.file-info { display: grid; gap: 2px; padding: 10px 14px 4px; min-width: 0; }
++.file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
++.file-actions { display: flex; gap: 8px; padding: 6px 14px 12px; justify-content: flex-end; }
++
++/* ---------- footer ---------- */
++.note-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 36px; padding-top: 18px; border-top: 1px solid rgba(var(--white-rgb), 0.08); }
++.confirm { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; }
++
++@media (max-width: 480px) {
++  .top button.primary { width: 100%; }
++  .files { grid-template-columns: 1fr 1fr; gap: 10px; }
++  .file-actions { padding: 4px 10px 10px; }
++  .file-info { padding: 8px 10px 2px; }
++}
+diff --git a/apps/notes/frontend/src/App.jsx b/apps/notes/frontend/src/App.jsx
+new file mode 100644
+index 0000000..36c4d89
+--- /dev/null
++++ b/apps/notes/frontend/src/App.jsx
+@@ -0,0 +1,488 @@
++import { useCallback, useEffect, useMemo, useRef, useState } from "react";
++import "./App.css";
++
++const API = `${import.meta.env.BASE_URL}api`;
++const SAVE_DELAY = 700; // ms of no typing before a note autosaves
++
++// ---------- API helpers ----------
++async function call(path, { method, body } = {}) {
++  const res = await fetch(`${API}${path}`, {
++    method: method || (body ? "POST" : "GET"),
++    headers: body ? { "Content-Type": "application/json" } : undefined,
++    body: body ? JSON.stringify(body) : undefined,
++  });
++  // If the login cookie expired, oauth2-proxy answers with its sign-in page (HTML).
++  const isJson = (res.headers.get("content-type") || "").includes("application/json");
++  if (!isJson) throw new Error("You've been signed out. Reload the page to sign in again.");
++  const data = await res.json();
++  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
++  return data;
++}
++
++// fetch() can't report upload progress, XMLHttpRequest can.
++function uploadFile(noteId, file, onProgress) {
++  return new Promise((resolve, reject) => {
++    const xhr = new XMLHttpRequest();
++    xhr.open("POST", `${API}/notes/${noteId}/files`);
++    xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
++    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
++    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
++    xhr.onload = () => {
++      let data = {};
++      try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
++      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
++      else reject(new Error(data.error || `Upload failed (${xhr.status})`));
++    };
++    xhr.onerror = () => reject(new Error("Network error during upload"));
++    xhr.send(file);
++  });
++}
++
++// ---------- formatting ----------
++const fmtSize = (b) =>
++  b < 1024 ? `${b} B` : b < 1024 ** 2 ? `${(b / 1024).toFixed(0)} KB` : b < 1024 ** 3 ? `${(b / 1024 ** 2).toFixed(1)} MB` : `${(b / 1024 ** 3).toFixed(2)} GB`;
++
++const fmtDate = (iso) => {
++  const d = new Date(iso);
++  const today = new Date();
++  if (d.toDateString() === today.toDateString())
++    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
++  return d.toLocaleDateString([], { day: "numeric", month: "short", ...(d.getFullYear() !== today.getFullYear() && { year: "numeric" }) });
++};
++
++const ext = (name) => (name.includes(".") ? name.split(".").pop().slice(0, 4).toUpperCase() : "FILE");
++const isImage = (type) => /^image\/(png|jpeg|gif|webp|avif)$/.test(type);
++
++// ---------- tiny icon set (stroke icons, inherit colour) ----------
++const PATHS = {
++  plus: "M12 5v14M5 12h14",
++  back: "M15 18l-6-6 6-6",
++  clip: "M21 11.5l-8.6 8.6a5 5 0 01-7.1-7.1l8.6-8.6a3.3 3.3 0 014.7 4.7l-8.6 8.6a1.7 1.7 0 01-2.4-2.4l8-8",
++  down: "M12 4v12m0 0l-5-5m5 5l5-5M5 20h14",
++  trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
++  search: "M11 18a7 7 0 100-14 7 7 0 000 14zM21 21l-5-5",
++  upload: "M12 16V4m0 0L7 9m5-5l5 5M5 20h14",
++  x: "M6 6l12 12M18 6L6 18",
++};
++const Icon = ({ name, size = 18 }) => (
++  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
++    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
++    <path d={PATHS[name]} />
++  </svg>
++);
++
++// The open note lives in the URL hash (#/n/<id>) so the browser back button works.
++const readHash = () => (window.location.hash.match(/^#\/n\/([0-9a-f-]{36})$/) || [])[1] || null;
++
++// =====================================================================
++export default function App() {
++  const [openId, setOpenId] = useState(readHash);
++  const [usage, setUsage] = useState(null);
++
++  useEffect(() => {
++    const onHash = () => setOpenId(readHash());
++    window.addEventListener("hashchange", onHash);
++    return () => window.removeEventListener("hashchange", onHash);
++  }, []);
++
++  const refreshUsage = useCallback(() => call("/usage").then(setUsage).catch(() => {}), []);
++  useEffect(() => { refreshUsage(); }, [refreshUsage]);
++
++  const open = (id) => { window.location.hash = id ? `/n/${id}` : ""; };
++
++  return (
++    <div className="page">
++      {openId ? (
++        <Editor key={openId} id={openId} usage={usage} onClose={() => open(null)} onUsage={refreshUsage} />
++      ) : (
++        <NoteList usage={usage} onOpen={open} />
++      )}
++    </div>
++  );
++}
++
++// =====================================================================
++function NoteList({ usage, onOpen }) {
++  const [notes, setNotes] = useState(null);
++  const [error, setError] = useState("");
++  const [search, setSearch] = useState("");
++  const [creating, setCreating] = useState(false);
++
++  useEffect(() => {
++    call("/notes").then(setNotes).catch((e) => setError(e.message));
++  }, []);
++
++  const shown = useMemo(() => {
++    if (!notes) return [];
++    const s = search.trim().toLowerCase();
++    return s ? notes.filter((n) => `${n.title} ${n.preview}`.toLowerCase().includes(s)) : notes;
++  }, [notes, search]);
++
++  const create = async () => {
++    setCreating(true);
++    try {
++      const n = await call("/notes", { body: { title: "", body: "" } });
++      onOpen(n.id);
++    } catch (e) {
++      setError(e.message);
++      setCreating(false);
++    }
++  };
++
++  return (
++    <div className="screen">
++      <header className="top">
++        <div>
++          <h1>Notes</h1>
++          <p className="muted small">Your notes and files, stored on the home lab.</p>
++        </div>
++        <button className="primary" onClick={create} disabled={creating}>
++          <Icon name="plus" /> New note
++        </button>
++      </header>
++
++      {usage && <UsageBar usage={usage} />}
++
++      <label className="search">
++        <Icon name="search" />
++        <input
++          type="search"
++          placeholder="Search notes"
++          value={search}
++          onChange={(e) => setSearch(e.target.value)}
++          aria-label="Search notes"
++        />
++      </label>
++
++      {error && <p className="error">{error}</p>}
++      {!notes && !error && <div className="spinner" />}
++
++      {notes && notes.length === 0 && (
++        <div className="empty glass">
++          <p>No notes yet.</p>
++          <p className="muted small">Create one, then drop files onto it to attach them.</p>
++        </div>
++      )}
++      {notes && notes.length > 0 && shown.length === 0 && <p className="muted center">Nothing matches “{search}”.</p>}
++
++      <ul className="list">
++        {shown.map((n, i) => (
++          <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
++            <button className="note-card" onClick={() => onOpen(n.id)}>
++              <span className="note-title">{n.title || "Untitled"}</span>
++              {n.preview.trim() && <span className="note-preview">{n.preview.replace(/\s+/g, " ").trim()}</span>}
++              <span className="note-meta">
++                <span>{fmtDate(n.updated)}</span>
++                {n.files > 0 && (
++                  <span className="pill"><Icon name="clip" size={13} /> {n.files}</span>
++                )}
++              </span>
++            </button>
++          </li>
++        ))}
++      </ul>
++    </div>
++  );
++}
++
++function UsageBar({ usage }) {
++  const pct = Math.min(100, (usage.used / usage.quota) * 100);
++  return (
++    <div className="usage" title={`${fmtSize(usage.used)} of ${fmtSize(usage.quota)} used`}>
++      <div className="track"><div className="fill" style={{ width: `${pct}%` }} /></div>
++      <span className="mono small muted">{fmtSize(usage.used)} / {fmtSize(usage.quota)}</span>
++    </div>
++  );
++}
++
++// =====================================================================
++function Editor({ id, usage, onClose, onUsage }) {
++  const [note, setNote] = useState(null);
++  const [error, setError] = useState("");
++  const [status, setStatus] = useState("saved"); // saved | dirty | saving | error
++  const [confirmDelete, setConfirmDelete] = useState(false);
++
++  const draft = useRef(null);  // latest title/body, read by the save timer
++  const timer = useRef(null);
++  const bodyRef = useRef(null);
++
++  useEffect(() => {
++    call(`/notes/${id}`)
++      .then((n) => { setNote(n); draft.current = { title: n.title, body: n.body }; })
++      .catch((e) => setError(e.message));
++    return () => clearTimeout(timer.current);
++  }, [id]);
++
++  // grow the textarea with its content
++  useEffect(() => {
++    const el = bodyRef.current;
++    if (el) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
++  }, [note?.body]);
++
++  const save = useCallback(async () => {
++    clearTimeout(timer.current);
++    if (!draft.current) return;
++    setStatus("saving");
++    try {
++      await call(`/notes/${id}`, { method: "PUT", body: draft.current });
++      setStatus("saved");
++    } catch (e) {
++      setStatus("error");
++      setError(e.message);
++    }
++  }, [id]);
++
++  const edit = (field) => (e) => {
++    const value = e.target.value;
++    setNote((n) => ({ ...n, [field]: value }));
++    draft.current = { ...draft.current, [field]: value };
++    setStatus("dirty");
++    clearTimeout(timer.current);
++    timer.current = setTimeout(save, SAVE_DELAY);
++  };
++
++  // Leaving: save pending changes; quietly drop a note that was never used.
++  const close = async () => {
++    if (note && !note.title.trim() && !note.body.trim() && note.files.length === 0) {
++      await call(`/notes/${id}`, { method: "DELETE" }).catch(() => {});
++    } else if (status === "dirty") {
++      await save();
++    }
++    onClose();
++  };
++
++  // Save before the tab closes or reloads.
++  useEffect(() => {
++    const onLeave = () => {
++      if (status === "dirty" && draft.current) {
++        fetch(`${API}/notes/${id}`, {
++          method: "PUT", keepalive: true,
++          headers: { "Content-Type": "application/json" },
++          body: JSON.stringify(draft.current),
++        });
++      }
++    };
++    window.addEventListener("pagehide", onLeave);
++    return () => window.removeEventListener("pagehide", onLeave);
++  }, [id, status]);
++
++  const removeNote = async () => {
++    try {
++      await call(`/notes/${id}`, { method: "DELETE" });
++      onUsage();
++      onClose();
++    } catch (e) {
++      setError(e.message);
++    }
++  };
++
++  const setFiles = (fn) => setNote((n) => ({ ...n, files: fn(n.files) }));
++
++  if (!note) {
++    return (
++      <div className="screen">
++        <button className="ghost back" onClick={onClose}><Icon name="back" /> All notes</button>
++        {error ? <p className="error">{error}</p> : <div className="spinner" />}
++      </div>
++    );
++  }
++
++  return (
++    <div className="screen">
++      <div className="editor-bar">
++        <button className="ghost back" onClick={close}><Icon name="back" /> All notes</button>
++        <span className={`save-state ${status}`} aria-live="polite">
++          {{ saved: "Saved", dirty: "Editing…", saving: "Saving…", error: "Not saved" }[status]}
++        </span>
++      </div>
++
++      <div className="sheet glass">
++        <input
++          className="title-input"
++          placeholder="Title"
++          value={note.title}
++          onChange={edit("title")}
++          maxLength={200}
++          aria-label="Title"
++        />
++        <textarea
++          ref={bodyRef}
++          className="body-input"
++          placeholder="Start writing…"
++          value={note.body}
++          onChange={edit("body")}
++          aria-label="Note"
++        />
++      </div>
++
++      {error && <p className="error">{error}</p>}
++
++      <Attachments
++        noteId={id}
++        files={note.files}
++        setFiles={setFiles}
++        maxFile={usage?.maxFile ?? 50 * 1024 * 1024}
++        onUsage={onUsage}
++      />
++
++      <div className="note-footer">
++        <span className="muted small">Edited {fmtDate(note.updated)}</span>
++        {!confirmDelete ? (
++          <button className="ghost danger-text" onClick={() => setConfirmDelete(true)}>
++            <Icon name="trash" /> Delete note
++          </button>
++        ) : (
++          <div className="confirm pop">
++            <span>Delete this note{note.files.length ? ` and ${note.files.length} file${note.files.length > 1 ? "s" : ""}` : ""}?</span>
++            <button onClick={() => setConfirmDelete(false)}>Cancel</button>
++            <button className="danger" onClick={removeNote}>Delete</button>
++          </div>
++        )}
++      </div>
++    </div>
++  );
++}
++
++// =====================================================================
++function Attachments({ noteId, files, setFiles, maxFile, onUsage }) {
++  const [queue, setQueue] = useState([]); // uploads in progress: {key, name, progress, error}
++  const [dragging, setDragging] = useState(false);
++  const [confirmId, setConfirmId] = useState(null);
++  const input = useRef(null);
++  const busy = useRef(false);    // is the upload loop running?
++  const pending = useRef([]);    // files waiting their turn
++
++  const patch = (key, changes) => setQueue((q) => q.map((u) => (u.key === key ? { ...u, ...changes } : u)));
++
++  // Uploads run one at a time, so the backend never holds several big files at once.
++  const addFiles = async (list) => {
++    const items = [...list].map((file) => ({
++      key: `${file.name}-${file.size}-${Math.random()}`,
++      file, name: file.name, progress: 0,
++      error: file.size > maxFile ? `Over the ${fmtSize(maxFile)} limit` : file.size === 0 ? "Empty file" : "",
++    }));
++    setQueue((q) => [...q, ...items]);
++    if (busy.current) { pending.current.push(...items); return; }
++    busy.current = true;
++    pending.current.push(...items);
++    while (pending.current.length) {
++      const u = pending.current.shift();
++      if (u.error) continue;
++      try {
++        const saved = await uploadFile(noteId, u.file, (p) => patch(u.key, { progress: p }));
++        setFiles((f) => [...f, saved]);
++        setQueue((q) => q.filter((x) => x.key !== u.key));
++        onUsage();
++      } catch (e) {
++        patch(u.key, { error: e.message });
++      }
++    }
++    busy.current = false;
++  };
++
++  // paste a screenshot anywhere on the page to attach it
++  useEffect(() => {
++    const onPaste = (e) => {
++      const pasted = [...(e.clipboardData?.files || [])];
++      if (pasted.length) { e.preventDefault(); addFiles(pasted); }
++    };
++    window.addEventListener("paste", onPaste);
++    return () => window.removeEventListener("paste", onPaste);
++  });
++
++  const remove = async (id) => {
++    setConfirmId(null);
++    try {
++      await call(`/files/${id}`, { method: "DELETE" });
++      setFiles((f) => f.filter((x) => x.id !== id));
++      onUsage();
++    } catch (e) {
++      alert(e.message);
++    }
++  };
++
++  return (
++    <section className="attachments">
++      <h2><Icon name="clip" size={16} /> Attachments {files.length > 0 && <span className="muted">· {files.length}</span>}</h2>
++
++      <div
++        className={`drop ${dragging ? "over" : ""}`}
++        role="button"
++        tabIndex={0}
++        onClick={() => input.current.click()}
++        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && input.current.click()}
++        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
++        onDragLeave={() => setDragging(false)}
++        onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
++      >
++        <Icon name="upload" size={22} />
++        <span>Drop files here, paste, or <u>browse</u></span>
++        <span className="muted small">Up to {fmtSize(maxFile)} each</span>
++        <input
++          ref={input}
++          type="file"
++          multiple
++          hidden
++          onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
++        />
++      </div>
++
++      {queue.length > 0 && (
++        <ul className="uploads">
++          {queue.map((u) => (
++            <li key={u.key} className={u.error ? "failed" : ""}>
++              <span className="up-name">{u.name}</span>
++              {u.error ? (
++                <>
++                  <span className="error small">{u.error}</span>
++                  <button className="icon-btn" aria-label="Dismiss"
++                    onClick={() => setQueue((q) => q.filter((x) => x.key !== u.key))}><Icon name="x" size={16} /></button>
++                </>
++              ) : (
++                <>
++                  <div className="track"><div className="fill live" style={{ width: `${u.progress * 100}%` }} /></div>
++                  <span className="mono small muted">{Math.round(u.progress * 100)}%</span>
++                </>
++              )}
++            </li>
++          ))}
++        </ul>
++      )}
++
++      {files.length > 0 && (
++        <ul className="files">
++          {files.map((f, i) => (
++            <li key={f.id} className="file glass" style={{ "--i": Math.min(i, 12) }}>
++              <a className="thumb" href={`${API}/files/${f.id}`} target="_blank" rel="noopener noreferrer">
++                {isImage(f.type) ? (
++                  <img src={`${API}/files/${f.id}`} alt={f.name} loading="lazy" />
++                ) : (
++                  <span className="ext">{ext(f.name)}</span>
++                )}
++              </a>
++              <div className="file-info">
++                <span className="file-name" title={f.name}>{f.name}</span>
++                <span className="muted small mono">{fmtSize(f.size)}</span>
++              </div>
++              {confirmId === f.id ? (
++                <div className="file-actions pop">
++                  <button className="danger small-btn" onClick={() => remove(f.id)}>Delete</button>
++                  <button className="small-btn" onClick={() => setConfirmId(null)}>Keep</button>
++                </div>
++              ) : (
++                <div className="file-actions">
++                  <a className="icon-btn" href={`${API}/files/${f.id}?download`} aria-label={`Download ${f.name}`}>
++                    <Icon name="down" size={16} />
++                  </a>
++                  <button className="icon-btn" aria-label={`Delete ${f.name}`} onClick={() => setConfirmId(f.id)}>
++                    <Icon name="trash" size={16} />
++                  </button>
++                </div>
++              )}
++            </li>
++          ))}
++        </ul>
++      )}
++    </section>
++  );
++}
+diff --git a/apps/notes/frontend/src/index.css b/apps/notes/frontend/src/index.css
+new file mode 100644
+index 0000000..15a0220
+--- /dev/null
++++ b/apps/notes/frontend/src/index.css
+@@ -0,0 +1,177 @@
++/* =====================================================================
++   notes — aurora background + liquid glass (same recipe as landing)
++   Every colour lives in the :root block below. Edit it there only.
++   ===================================================================== */
++
++:root {
++  /* ---------- palette ---------- */
++  --bg: #05090b;
++  --text: #e8ecea;
++  --text-strong: #f4f6f5;
++  --text-soft: #b7c3c5;
++  --muted: #8ea3a7;
++
++  /* accent: the "rgb" versions let us write rgba(var(--accent-rgb), 0.3) */
++  --accent-rgb: 103, 232, 249;          /* cyan (#67e8f9) */
++  --accent-light-rgb: 165, 243, 252;    /* lighter cyan for highlights */
++  --accent: rgb(var(--accent-rgb));
++
++  --on-accent: #101a1c;                 /* text colour on accent buttons */
++  --accent-grad: linear-gradient(135deg, rgba(var(--accent-light-rgb), 0.95), rgba(var(--accent-rgb), 0.75));
++  --accent-grad-hover: linear-gradient(135deg, rgba(var(--accent-light-rgb), 1), rgba(var(--accent-rgb), 0.9));
++
++  --teal: #6fd6c4;
++  --amber: #f2a65a;
++
++  --danger-rgb: 224, 122, 107;
++  --danger: rgb(var(--danger-rgb));
++  --danger-solid: #c4493c;
++  --danger-solid-hover: #d6554a;
++  --on-danger: #fff;
++
++  --white-rgb: 255, 255, 255;
++  --black-rgb: 0, 0, 0;
++
++  /* aurora blobs (r, g, b) */
++  --aurora-1: var(--accent-rgb);
++  --aurora-2: 143, 168, 255;   /* blue */
++  --aurora-3: 181, 140, 240;   /* violet */
++  --aurora-4: 224, 122, 159;   /* pink */
++  --aurora-5: 111, 214, 196;   /* teal */
++  --noise-opacity: 0.09;       /* 0 = no grain, 0.15 = very grainy */
++
++  /* ---------- shapes ---------- */
++  --btn-radius: 20px;
++  --panel-radius: 22px;
++  --field-radius: 16px;
++
++  /* ---------- the liquid-glass recipe ---------- */
++  --glass-bg: linear-gradient(145deg, rgba(var(--white-rgb), 0.11), rgba(var(--white-rgb), 0.03));
++  --glass-bg-hover: linear-gradient(145deg, rgba(var(--white-rgb), 0.17), rgba(var(--white-rgb), 0.06));
++  --glass-border: 1px solid rgba(var(--white-rgb), 0.15);
++  --glass-border-hover: rgba(var(--white-rgb), 0.3);
++  --glass-blur: saturate(100%);
++  --glass-shadow:
++    inset 0 1px 0 rgba(var(--white-rgb), 0.32),
++    inset 0 -1px 0 rgba(var(--white-rgb), 0.05),
++    0 10px 30px rgba(var(--black-rgb), 0.35);
++}
++
++* { box-sizing: border-box; }
++html, body, #root { min-height: 100%; margin: 0; }
++
++html {
++  background:
++    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
++    radial-gradient(90% 60% at 100% 100%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 70%),
++    var(--bg);
++  background-repeat: no-repeat;
++}
++
++body {
++  min-height: 100vh;
++  color: var(--text);
++  font-family: "IBM Plex Sans", system-ui, sans-serif;
++  -webkit-font-smoothing: antialiased;
++}
++
++/* ---------- aurora background ----------
++   Three fixed layers, each holding two soft glows. Every layer moves on its
++   own slow loop (47s, 61s, 83s) and "breathes" on another (19s, 29s, 37s).
++   Because the loop lengths don't line up, the combined motion takes minutes
++   to repeat and looks random. Only transform + opacity are animated, so it
++   runs on the GPU and stays smooth.                                        */
++html::before,
++html::after,
++body::before {
++  content: "";
++  position: fixed;
++  inset: -25%;
++  z-index: -1;
++  pointer-events: none;
++  will-change: transform, opacity;
++}
++
++html::before {
++  background:
++    radial-gradient(60% 26% at 30% 30%, rgba(var(--aurora-1), 0.34), transparent 70%),
++    radial-gradient(40% 40% at 75% 70%, rgba(var(--aurora-2), 0.26), transparent 70%);
++  animation: wanderA 47s ease-in-out infinite alternate, breatheA 19s ease-in-out infinite alternate;
++}
++html::after {
++  background:
++    radial-gradient(55% 24% at 70% 25%, rgba(var(--aurora-3), 0.30), transparent 70%),
++    radial-gradient(38% 38% at 20% 75%, rgba(var(--aurora-4), 0.22), transparent 70%);
++  animation: wanderB 61s ease-in-out infinite alternate-reverse, breatheB 29s ease-in-out infinite alternate;
++  animation-delay: -18s, -7s;
++}
++body::before {
++  background:
++    radial-gradient(50% 22% at 55% 55%, rgba(var(--aurora-5), 0.26), transparent 70%),
++    radial-gradient(30% 30% at 85% 15%, rgba(var(--aurora-1), 0.20), transparent 70%);
++  animation: wanderC 83s ease-in-out infinite alternate, breatheC 37s ease-in-out infinite alternate;
++  animation-delay: -41s, -12s;
++}
++
++/* Phones / portrait screens: make the glow layers a big centred square so
++   their corners never swing into view when the animation rotates them. */
++@media (orientation: portrait) {
++  html::before,
++  html::after,
++  body::before {
++    inset: auto;                       /* cancel the -25% sizing */
++    top: 50%;
++    left: 50%;
++    width: 200vmax;                    /* vmax = 1% of the screen's longer side */
++    height: 200vmax;
++    margin: -100vmax 0 0 -100vmax;     /* pull it back by half, so it's centred */
++  }
++}
++
++/* film grain: a tiny generated noise tile, laid over the glows */
++body::after {
++  content: "";
++  position: fixed;
++  inset: 0;
++  z-index: -1;
++  pointer-events: none;
++  opacity: var(--noise-opacity);
++  mix-blend-mode: overlay;
++  background-size: 220px 220px;
++  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
++}
++
++@keyframes wanderA {
++  0%   { transform: translate3d(-6%, 4%, 0)  rotate(-8deg) scale(1); }
++  22%  { transform: translate3d(5%, -7%, 0)  rotate(4deg)  scale(1.12); }
++  47%  { transform: translate3d(9%, 6%, 0)   rotate(11deg) scale(0.96); }
++  71%  { transform: translate3d(-4%, 10%, 0) rotate(-3deg) scale(1.15); }
++  100% { transform: translate3d(3%, -5%, 0)  rotate(7deg)  scale(1.04); }
++}
++@keyframes wanderB {
++  0%   { transform: translate3d(7%, -6%, 0)  rotate(10deg)  scale(1.1); }
++  18%  { transform: translate3d(-8%, 3%, 0)  rotate(-6deg)  scale(0.97); }
++  44%  { transform: translate3d(2%, 9%, 0)   rotate(-12deg) scale(1.18); }
++  68%  { transform: translate3d(10%, 1%, 0)  rotate(5deg)   scale(1); }
++  100% { transform: translate3d(-5%, -8%, 0) rotate(-2deg)  scale(1.08); }
++}
++@keyframes wanderC {
++  0%   { transform: translate3d(0, 8%, 0)    rotate(6deg)   scale(1.05); }
++  27%  { transform: translate3d(-9%, -3%, 0) rotate(-9deg)  scale(1.16); }
++  52%  { transform: translate3d(6%, -9%, 0)  rotate(3deg)   scale(0.95); }
++  79%  { transform: translate3d(8%, 5%, 0)   rotate(-5deg)  scale(1.1); }
++  100% { transform: translate3d(-7%, 2%, 0)  rotate(12deg)  scale(1); }
++}
++@keyframes breatheA { 0% { opacity: 0.55; } 35% { opacity: 1; }    60% { opacity: 0.7; }  100% { opacity: 0.95; } }
++@keyframes breatheB { 0% { opacity: 1; }    30% { opacity: 0.5; }  65% { opacity: 0.9; }  100% { opacity: 0.6; } }
++@keyframes breatheC { 0% { opacity: 0.7; }  40% { opacity: 0.45; } 70% { opacity: 1; }    100% { opacity: 0.8; } }
++
++/* ---------- accessibility ---------- */
++@media (prefers-reduced-motion: reduce) {
++  *, *::before, *::after {
++    animation-duration: 0.001ms !important;
++    animation-iteration-count: 1 !important;
++    animation-delay: 0ms !important;
++    transition-duration: 0.001ms !important;
++  }
++}
+\ No newline at end of file
+diff --git a/apps/notes/frontend/src/main.jsx b/apps/notes/frontend/src/main.jsx
+new file mode 100644
+index 0000000..b91620d
+--- /dev/null
++++ b/apps/notes/frontend/src/main.jsx
+@@ -0,0 +1,10 @@
++import React from "react";
++import ReactDOM from "react-dom/client";
++import App from "./App.jsx";
++import "./index.css";
++
++ReactDOM.createRoot(document.getElementById("root")).render(
++  <React.StrictMode>
++    <App />
++  </React.StrictMode>
++);
+diff --git a/apps/notes/frontend/vite.config.js b/apps/notes/frontend/vite.config.js
+new file mode 100644
+index 0000000..336959e
+--- /dev/null
++++ b/apps/notes/frontend/vite.config.js
+@@ -0,0 +1,20 @@
++import { defineConfig } from "vite";
++import react from "@vitejs/plugin-react";
++
++export default defineConfig({
++  plugins: [react()],
++  // Served at the root of notes.xtemplate.cc.
++  base: "/",
++  server: {
++    proxy: {
++      // Only for `npm run dev` on your laptop: forwards API calls to a locally
++      // running backend. In the cluster the ingress sends /api to the backend.
++      "/api": {
++        target: "http://localhost:8081",
++        changeOrigin: true,
++        // The backend expects oauth2-proxy's header; fake one user locally.
++        headers: { "X-Auth-Request-User": "local-dev" },
++      },
++    },
++  },
++});
+-- 
+2.43.0
+
+
+From 0896c4dc6614f12efcb058277b11a9e48d5009d2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 25 Oct 2026 20:13:33 +0800
+Subject: [PATCH 2/3] notes: two-column masonry list with image covers
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011uSz4DGamov7QvaYAFvFhK
+---
+ apps/notes/backend/server.js    |  8 +++-
+ apps/notes/frontend/src/App.css | 19 ++++++---
+ apps/notes/frontend/src/App.jsx | 75 ++++++++++++++++++++++++++-------
+ 3 files changed, 78 insertions(+), 24 deletions(-)
+
+diff --git a/apps/notes/backend/server.js b/apps/notes/backend/server.js
+index ead3d6e..b0954b5 100644
+--- a/apps/notes/backend/server.js
++++ b/apps/notes/backend/server.js
+@@ -62,8 +62,12 @@ db.exec(`
+ 
+ const q = {
+   list: db.prepare(`
+-    SELECT n.id, n.title, substr(n.body, 1, 160) AS preview, n.updated,
+-           (SELECT COUNT(*) FROM files f WHERE f.note_id = n.id) AS files
++    SELECT n.id, n.title, substr(n.body, 1, 400) AS preview, n.updated,
++           (SELECT COUNT(*) FROM files f WHERE f.note_id = n.id) AS files,
++           -- first image attached to the note, shown on its card in the list
++           (SELECT f.id FROM files f WHERE f.note_id = n.id
++              AND f.type IN ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif')
++              ORDER BY f.created LIMIT 1) AS cover
+     FROM notes n WHERE n.user = ? ORDER BY n.updated DESC`),
+   get: db.prepare("SELECT id, title, body, created, updated FROM notes WHERE id = ? AND user = ?"),
+   add: db.prepare("INSERT INTO notes (id, user, title, body, created, updated) VALUES (?, ?, ?, ?, ?, ?)"),
+diff --git a/apps/notes/frontend/src/App.css b/apps/notes/frontend/src/App.css
+index 6d6fccc..814f41a 100644
+--- a/apps/notes/frontend/src/App.css
++++ b/apps/notes/frontend/src/App.css
+@@ -120,23 +120,28 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+ .search svg { position: absolute; left: 16px; pointer-events: none; }
+ .search input { padding-left: 44px; }
+ 
+-.list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 10px; }
+-.list li { animation: fadeUp 0.4s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }
++/* Pinterest-style: two independent columns, each card only as tall as it needs */
++.masonry { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; }
++.masonry-col { flex: 1; min-width: 0; list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
++.masonry-col li { animation: fadeUp 0.4s ease-out both; animation-delay: calc(var(--i, 0) * 40ms); }
+ 
+ .note-card {
+   width: 100%;
+   display: flex;
+   flex-direction: column;
+   align-items: stretch;
+-  gap: 6px;
+-  padding: 16px 20px;
++  padding: 0;
++  overflow: hidden;
+   text-align: left;
+ }
+ .note-card:hover:not(:disabled) { border-color: var(--glass-border-hover); }
+-.note-title { font-family: "Space Grotesk", sans-serif; font-size: 1.1rem; font-weight: 500; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.note-cover { display: block; width: 100%; max-height: 220px; object-fit: cover; border-bottom: 1px solid rgba(var(--white-rgb), 0.08); }
++.note-text { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; min-width: 0; }
++.note-title { font-family: "Space Grotesk", sans-serif; font-size: 1.05rem; font-weight: 500; color: var(--text-strong); overflow-wrap: anywhere; }
+ .note-preview {
+-  color: var(--text-soft); font-size: 0.9rem; line-height: 1.45;
+-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
++  color: var(--text-soft); font-size: 0.88rem; line-height: 1.45;
++  white-space: pre-line; overflow-wrap: anywhere;
++  display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden;
+ }
+ .note-meta { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.8rem; font-family: "IBM Plex Mono", monospace; }
+ .pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: rgba(var(--accent-rgb), 0.12); color: var(--accent); }
+diff --git a/apps/notes/frontend/src/App.jsx b/apps/notes/frontend/src/App.jsx
+index 36c4d89..42368ef 100644
+--- a/apps/notes/frontend/src/App.jsx
++++ b/apps/notes/frontend/src/App.jsx
+@@ -118,6 +118,9 @@ function NoteList({ usage, onOpen }) {
+     return s ? notes.filter((n) => `${n.title} ${n.preview}`.toLowerCase().includes(s)) : notes;
+   }, [notes, search]);
+ 
++  const columnCount = useColumnCount();
++  const columns = useMemo(() => splitIntoColumns(shown, columnCount), [shown, columnCount]);
++
+   const create = async () => {
+     setCreating(true);
+     try {
+@@ -165,26 +168,68 @@ function NoteList({ usage, onOpen }) {
+       )}
+       {notes && notes.length > 0 && shown.length === 0 && <p className="muted center">Nothing matches “{search}”.</p>}
+ 
+-      <ul className="list">
+-        {shown.map((n, i) => (
+-          <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
+-            <button className="note-card" onClick={() => onOpen(n.id)}>
+-              <span className="note-title">{n.title || "Untitled"}</span>
+-              {n.preview.trim() && <span className="note-preview">{n.preview.replace(/\s+/g, " ").trim()}</span>}
+-              <span className="note-meta">
+-                <span>{fmtDate(n.updated)}</span>
+-                {n.files > 0 && (
+-                  <span className="pill"><Icon name="clip" size={13} /> {n.files}</span>
+-                )}
+-              </span>
+-            </button>
+-          </li>
++      <div className="masonry">
++        {columns.map((col, c) => (
++          <ul className="masonry-col" key={c}>
++            {col.map(({ note: n, i }) => (
++              <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
++                <button className="note-card" onClick={() => onOpen(n.id)}>
++                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}`} alt="" loading="lazy" />}
++                  <span className="note-text">
++                    <span className="note-title">{n.title || "Untitled"}</span>
++                    {previewOf(n) && <span className="note-preview">{previewOf(n)}</span>}
++                    <span className="note-meta">
++                      <span>{fmtDate(n.updated)}</span>
++                      {n.files > 0 && (
++                        <span className="pill"><Icon name="clip" size={13} /> {n.files}</span>
++                      )}
++                    </span>
++                  </span>
++                </button>
++              </li>
++            ))}
++          </ul>
+         ))}
+-      </ul>
++      </div>
+     </div>
+   );
+ }
+ 
++// Keep line breaks, but squash runs of blank lines.
++const previewOf = (n) => n.preview.replace(/\n{3,}/g, "\n\n").trim();
++
++// Rough height of a card, so each note can go into whichever column is shorter.
++function estimateHeight(n) {
++  const lines = previewOf(n)
++    .split("\n")
++    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 26)), 0);
++  return 70 + Math.min(lines, 8) * 21 + (n.cover ? 140 : 0);
++}
++
++// Two columns, or one on very narrow screens.
++function useColumnCount() {
++  const pick = () => (window.innerWidth < 360 ? 1 : 2);
++  const [count, setCount] = useState(pick);
++  useEffect(() => {
++    const onResize = () => setCount(pick());
++    window.addEventListener("resize", onResize);
++    return () => window.removeEventListener("resize", onResize);
++  }, []);
++  return count;
++}
++
++// Deal notes out like Pinterest: newest first, each one into the shorter column.
++// (CSS "columns" would fill the whole left column first and break newest-first order.)
++function splitIntoColumns(notes, count) {
++  const cols = Array.from({ length: count }, () => ({ items: [], height: 0 }));
++  notes.forEach((note, i) => {
++    const shortest = cols.reduce((a, b) => (b.height < a.height ? b : a));
++    shortest.items.push({ note, i });
++    shortest.height += estimateHeight(note);
++  });
++  return cols.map((c) => c.items);
++}
++
+ function UsageBar({ usage }) {
+   const pct = Math.min(100, (usage.used / usage.quota) * 100);
+   return (
+-- 
+2.43.0
+
+
+From 2a1571c462976aca2fe3359a67f0fa57ea321d3e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 25 Oct 2026 20:31:38 +0800
+Subject: [PATCH 3/3] notes: WebP thumbnails for image previews
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_011uSz4DGamov7QvaYAFvFhK
+---
+ app-deployments/notes/backend/deployment.yaml |  7 +-
+ apps/notes/backend/package.json               |  3 +-
+ apps/notes/backend/server.js                  | 89 +++++++++++++++++--
+ apps/notes/frontend/src/App.jsx               |  4 +-
+ 4 files changed, 90 insertions(+), 13 deletions(-)
+
+diff --git a/app-deployments/notes/backend/deployment.yaml b/app-deployments/notes/backend/deployment.yaml
+index 6fee369..890c60d 100644
+--- a/app-deployments/notes/backend/deployment.yaml
++++ b/app-deployments/notes/backend/deployment.yaml
+@@ -66,9 +66,10 @@ spec:
+               path: /livez
+               port: api
+           resources:
+-            # A 50 MB upload is held in memory briefly before going to MinIO.
+-            requests: { cpu: 10m, memory: 64Mi }
+-            limits: { cpu: 500m, memory: 384Mi }
++            # Image uploads (up to 50 MB) are held in memory while the
++            # thumbnail is made; big photos need some room to decode.
++            requests: { cpu: 10m, memory: 96Mi }
++            limits: { cpu: "1", memory: 512Mi }
+           securityContext:
+             allowPrivilegeEscalation: false
+             capabilities:
+diff --git a/apps/notes/backend/package.json b/apps/notes/backend/package.json
+index a4b87ee..7cfc008 100644
+--- a/apps/notes/backend/package.json
++++ b/apps/notes/backend/package.json
+@@ -8,6 +8,7 @@
+     "start": "node server.js"
+   },
+   "dependencies": {
+-    "minio": "^8.0.5"
++    "minio": "^8.0.5",
++    "sharp": "^0.35.4"
+   }
+ }
+diff --git a/apps/notes/backend/server.js b/apps/notes/backend/server.js
+index b0954b5..d2bfca1 100644
+--- a/apps/notes/backend/server.js
++++ b/apps/notes/backend/server.js
+@@ -5,6 +5,13 @@ import http from "node:http";
+ import { randomUUID } from "node:crypto";
+ import { DatabaseSync } from "node:sqlite";
+ import * as Minio from "minio";
++import sharp from "sharp";
++
++// Thumbnails: one image at a time and no in-memory cache, to keep RAM low
++// on the EliteDesk. Big photos are shrunk while decoding, not after.
++sharp.concurrency(1);
++sharp.cache(false);
++const THUMB_SIZE = 640; // px, longest side: sharp on a 2x phone screen, still small
+ 
+ const PORT = Number(process.env.PORT || 8080);
+ const MB = 1024 * 1024;
+@@ -54,11 +61,18 @@ db.exec(`
+     id TEXT PRIMARY KEY,
+     note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+     user TEXT NOT NULL, key TEXT NOT NULL,
+-    name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created TEXT NOT NULL
++    name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created TEXT NOT NULL,
++    thumb INTEGER NOT NULL DEFAULT 0  -- 1 = a small preview exists at "<key>.thumb.webp"
+   );
+   CREATE INDEX IF NOT EXISTS files_note ON files (note_id);
+   CREATE INDEX IF NOT EXISTS files_user ON files (user);
+ `);
++// Databases created before thumbnails existed: add the column. Their old
++// images keep thumb = 0 and previews fall back to the original.
++if (!db.prepare("PRAGMA table_info(files)").all().some((c) => c.name === "thumb")) {
++  db.exec("ALTER TABLE files ADD COLUMN thumb INTEGER NOT NULL DEFAULT 0");
++}
++const thumbKey = (key) => `${key}.thumb.webp`;
+ 
+ const q = {
+   list: db.prepare(`
+@@ -75,10 +89,10 @@ const q = {
+   touch: db.prepare("UPDATE notes SET updated = ? WHERE id = ?"),
+   del: db.prepare("DELETE FROM notes WHERE id = ? AND user = ?"),
+   files: db.prepare("SELECT id, name, type, size, created FROM files WHERE note_id = ? ORDER BY created"),
+-  fileKeys: db.prepare("SELECT key FROM files WHERE note_id = ?"),
+-  file: db.prepare("SELECT id, note_id, key, name, type, size FROM files WHERE id = ? AND user = ?"),
++  fileKeys: db.prepare("SELECT key, thumb FROM files WHERE note_id = ?"),
++  file: db.prepare("SELECT id, note_id, key, name, type, size, thumb FROM files WHERE id = ? AND user = ?"),
+   addFile: db.prepare(
+-    "INSERT INTO files (id, note_id, user, key, name, type, size, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
++    "INSERT INTO files (id, note_id, user, key, name, type, size, created, thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+   ),
+   delFile: db.prepare("DELETE FROM files WHERE id = ?"),
+   used: db.prepare("SELECT COALESCE(SUM(size), 0) AS used FROM files WHERE user = ?"),
+@@ -126,6 +140,38 @@ function cleanName(raw) {
+ // notes.xtemplate.cc.
+ const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
+ 
++// Read a whole upload into memory, refusing anything that doesn't match its declared size.
++const readAll = (req, size) =>
++  new Promise((resolve, reject) => {
++    const chunks = [];
++    let got = 0;
++    req.on("data", (c) => {
++      got += c.length;
++      if (got > size) { reject(new Error("more data than declared")); req.destroy(); return; }
++      chunks.push(c);
++    });
++    req.on("end", () => (got === size ? resolve(Buffer.concat(chunks, size)) : reject(new Error("upload cut short"))));
++    req.on("error", reject);
++  });
++
++// Small WebP preview, stored next to the original. rotate() applies the phone's
++// orientation flag; metadata (EXIF, GPS location) is dropped from the preview.
++// If the image can't be read, the upload still succeeds, just without a preview.
++async function makeThumb(data, key) {
++  try {
++    const small = await sharp(data, { failOn: "none" })
++      .rotate()
++      .resize({ width: THUMB_SIZE, height: THUMB_SIZE, fit: "inside", withoutEnlargement: true })
++      .webp({ quality: 72 })
++      .toBuffer();
++    await s3.putObject(BUCKET, thumbKey(key), small, small.length, { "Content-Type": "image/webp" });
++    return 1;
++  } catch (err) {
++    console.error("thumbnail failed:", err.message);
++    return 0;
++  }
++}
++
+ const contentDisposition = (kind, name) =>
+   `${kind}; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+ 
+@@ -165,7 +211,7 @@ async function handle(req, res, user, p) {
+     }
+ 
+     if (req.method === "DELETE") {
+-      const keys = q.fileKeys.all(note.id).map((r) => r.key);
++      const keys = q.fileKeys.all(note.id).flatMap((r) => (r.thumb ? [r.key, thumbKey(r.key)] : [r.key]));
+       if (keys.length) await s3.removeObjects(BUCKET, keys);
+       q.del.run(note.id, user); // files rows go too (ON DELETE CASCADE)
+       return json(res, 200, { ok: true });
+@@ -189,18 +235,46 @@ async function handle(req, res, user, p) {
+     const type = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim().slice(0, 100)
+       || "application/octet-stream";
+ 
++    let thumb = 0;
+     try {
+-      await s3.putObject(BUCKET, key, req, size, { "Content-Type": type });
++      if (INLINE_TYPES.has(type)) {
++        // Images: keep the bytes in memory (max 50 MB) so we can also make a thumbnail.
++        const data = await readAll(req, size);
++        await s3.putObject(BUCKET, key, data, size, { "Content-Type": type });
++        thumb = await makeThumb(data, key);
++      } else {
++        // Everything else streams straight through to MinIO.
++        await s3.putObject(BUCKET, key, req, size, { "Content-Type": type });
++      }
+     } catch (err) {
+       console.error("upload failed:", err.message);
+       return json(res, 400, { error: "upload interrupted" });
+     }
+     const t = now();
+-    q.addFile.run(id, note.id, user, key, name, type, size, t);
++    q.addFile.run(id, note.id, user, key, name, type, size, t, thumb);
+     q.touch.run(t, note.id);
+     return json(res, 201, { id, name, type, size, created: t });
+   }
+ 
++  // small preview of an image; falls back to the original for images
++  // uploaded before thumbnails existed (or that couldn't be shrunk)
++  if (req.method === "GET" && (m = p.match(new RegExp(`^/api/files/(${ID})/thumb$`)))) {
++    const f = q.file.get(m[1], user);
++    if (!f || !INLINE_TYPES.has(f.type)) return json(res, 404, { error: "no preview" });
++    const key = f.thumb ? thumbKey(f.key) : f.key;
++    const stream = await s3.getObject(BUCKET, key);
++    res.writeHead(200, {
++      "Content-Type": f.thumb ? "image/webp" : f.type,
++      "Content-Disposition": "inline",
++      "X-Content-Type-Options": "nosniff",
++      "Content-Security-Policy": "default-src 'none'; img-src 'self'; sandbox",
++      // a file never changes once uploaded, so the browser can keep it for a week
++      "Cache-Control": "private, max-age=604800, immutable",
++    });
++    stream.on("error", (err) => { console.error("preview failed:", err.message); res.destroy(); });
++    return stream.pipe(res);
++  }
++
+   // download / view or delete an attachment
+   if ((m = p.match(new RegExp(`^/api/files/(${ID})$`)))) {
+     const f = q.file.get(m[1], user);
+@@ -224,6 +298,7 @@ async function handle(req, res, user, p) {
+ 
+     if (req.method === "DELETE") {
+       await s3.removeObject(BUCKET, f.key);
++      if (f.thumb) await s3.removeObject(BUCKET, thumbKey(f.key));
+       q.delFile.run(f.id);
+       q.touch.run(now(), f.note_id);
+       return json(res, 200, { ok: true });
+diff --git a/apps/notes/frontend/src/App.jsx b/apps/notes/frontend/src/App.jsx
+index 42368ef..478fb1d 100644
+--- a/apps/notes/frontend/src/App.jsx
++++ b/apps/notes/frontend/src/App.jsx
+@@ -174,7 +174,7 @@ function NoteList({ usage, onOpen }) {
+             {col.map(({ note: n, i }) => (
+               <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
+                 <button className="note-card" onClick={() => onOpen(n.id)}>
+-                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}`} alt="" loading="lazy" />}
++                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}/thumb`} alt="" loading="lazy" />}
+                   <span className="note-text">
+                     <span className="note-title">{n.title || "Untitled"}</span>
+                     {previewOf(n) && <span className="note-preview">{previewOf(n)}</span>}
+@@ -500,7 +500,7 @@ function Attachments({ noteId, files, setFiles, maxFile, onUsage }) {
+             <li key={f.id} className="file glass" style={{ "--i": Math.min(i, 12) }}>
+               <a className="thumb" href={`${API}/files/${f.id}`} target="_blank" rel="noopener noreferrer">
+                 {isImage(f.type) ? (
+-                  <img src={`${API}/files/${f.id}`} alt={f.name} loading="lazy" />
++                  <img src={`${API}/files/${f.id}/thumb`} alt={f.name} loading="lazy" />
+                 ) : (
+                   <span className="ext">{ext(f.name)}</span>
+                 )}
+-- 
+2.43.0
+

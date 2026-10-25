@@ -5,6 +5,13 @@ import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import * as Minio from "minio";
+import sharp from "sharp";
+
+// Thumbnails: one image at a time and no in-memory cache, to keep RAM low
+// on the EliteDesk. Big photos are shrunk while decoding, not after.
+sharp.concurrency(1);
+sharp.cache(false);
+const THUMB_SIZE = 640; // px, longest side: sharp on a 2x phone screen, still small
 
 const PORT = Number(process.env.PORT || 8080);
 const MB = 1024 * 1024;
@@ -54,11 +61,18 @@ db.exec(`
     id TEXT PRIMARY KEY,
     note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     user TEXT NOT NULL, key TEXT NOT NULL,
-    name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created TEXT NOT NULL
+    name TEXT NOT NULL, type TEXT NOT NULL, size INTEGER NOT NULL, created TEXT NOT NULL,
+    thumb INTEGER NOT NULL DEFAULT 0  -- 1 = a small preview exists at "<key>.thumb.webp"
   );
   CREATE INDEX IF NOT EXISTS files_note ON files (note_id);
   CREATE INDEX IF NOT EXISTS files_user ON files (user);
 `);
+// Databases created before thumbnails existed: add the column. Their old
+// images keep thumb = 0 and previews fall back to the original.
+if (!db.prepare("PRAGMA table_info(files)").all().some((c) => c.name === "thumb")) {
+  db.exec("ALTER TABLE files ADD COLUMN thumb INTEGER NOT NULL DEFAULT 0");
+}
+const thumbKey = (key) => `${key}.thumb.webp`;
 
 const q = {
   list: db.prepare(`
@@ -75,10 +89,10 @@ const q = {
   touch: db.prepare("UPDATE notes SET updated = ? WHERE id = ?"),
   del: db.prepare("DELETE FROM notes WHERE id = ? AND user = ?"),
   files: db.prepare("SELECT id, name, type, size, created FROM files WHERE note_id = ? ORDER BY created"),
-  fileKeys: db.prepare("SELECT key FROM files WHERE note_id = ?"),
-  file: db.prepare("SELECT id, note_id, key, name, type, size FROM files WHERE id = ? AND user = ?"),
+  fileKeys: db.prepare("SELECT key, thumb FROM files WHERE note_id = ?"),
+  file: db.prepare("SELECT id, note_id, key, name, type, size, thumb FROM files WHERE id = ? AND user = ?"),
   addFile: db.prepare(
-    "INSERT INTO files (id, note_id, user, key, name, type, size, created) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO files (id, note_id, user, key, name, type, size, created, thumb) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ),
   delFile: db.prepare("DELETE FROM files WHERE id = ?"),
   used: db.prepare("SELECT COALESCE(SUM(size), 0) AS used FROM files WHERE user = ?"),
@@ -126,6 +140,38 @@ function cleanName(raw) {
 // notes.xtemplate.cc.
 const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
 
+// Read a whole upload into memory, refusing anything that doesn't match its declared size.
+const readAll = (req, size) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+    let got = 0;
+    req.on("data", (c) => {
+      got += c.length;
+      if (got > size) { reject(new Error("more data than declared")); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on("end", () => (got === size ? resolve(Buffer.concat(chunks, size)) : reject(new Error("upload cut short"))));
+    req.on("error", reject);
+  });
+
+// Small WebP preview, stored next to the original. rotate() applies the phone's
+// orientation flag; metadata (EXIF, GPS location) is dropped from the preview.
+// If the image can't be read, the upload still succeeds, just without a preview.
+async function makeThumb(data, key) {
+  try {
+    const small = await sharp(data, { failOn: "none" })
+      .rotate()
+      .resize({ width: THUMB_SIZE, height: THUMB_SIZE, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 72 })
+      .toBuffer();
+    await s3.putObject(BUCKET, thumbKey(key), small, small.length, { "Content-Type": "image/webp" });
+    return 1;
+  } catch (err) {
+    console.error("thumbnail failed:", err.message);
+    return 0;
+  }
+}
+
 const contentDisposition = (kind, name) =>
   `${kind}; filename="${name.replace(/[^\x20-\x7e]|"/g, "_")}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 
@@ -165,7 +211,7 @@ async function handle(req, res, user, p) {
     }
 
     if (req.method === "DELETE") {
-      const keys = q.fileKeys.all(note.id).map((r) => r.key);
+      const keys = q.fileKeys.all(note.id).flatMap((r) => (r.thumb ? [r.key, thumbKey(r.key)] : [r.key]));
       if (keys.length) await s3.removeObjects(BUCKET, keys);
       q.del.run(note.id, user); // files rows go too (ON DELETE CASCADE)
       return json(res, 200, { ok: true });
@@ -189,16 +235,44 @@ async function handle(req, res, user, p) {
     const type = String(req.headers["content-type"] || "application/octet-stream").split(";")[0].trim().slice(0, 100)
       || "application/octet-stream";
 
+    let thumb = 0;
     try {
-      await s3.putObject(BUCKET, key, req, size, { "Content-Type": type });
+      if (INLINE_TYPES.has(type)) {
+        // Images: keep the bytes in memory (max 50 MB) so we can also make a thumbnail.
+        const data = await readAll(req, size);
+        await s3.putObject(BUCKET, key, data, size, { "Content-Type": type });
+        thumb = await makeThumb(data, key);
+      } else {
+        // Everything else streams straight through to MinIO.
+        await s3.putObject(BUCKET, key, req, size, { "Content-Type": type });
+      }
     } catch (err) {
       console.error("upload failed:", err.message);
       return json(res, 400, { error: "upload interrupted" });
     }
     const t = now();
-    q.addFile.run(id, note.id, user, key, name, type, size, t);
+    q.addFile.run(id, note.id, user, key, name, type, size, t, thumb);
     q.touch.run(t, note.id);
     return json(res, 201, { id, name, type, size, created: t });
+  }
+
+  // small preview of an image; falls back to the original for images
+  // uploaded before thumbnails existed (or that couldn't be shrunk)
+  if (req.method === "GET" && (m = p.match(new RegExp(`^/api/files/(${ID})/thumb$`)))) {
+    const f = q.file.get(m[1], user);
+    if (!f || !INLINE_TYPES.has(f.type)) return json(res, 404, { error: "no preview" });
+    const key = f.thumb ? thumbKey(f.key) : f.key;
+    const stream = await s3.getObject(BUCKET, key);
+    res.writeHead(200, {
+      "Content-Type": f.thumb ? "image/webp" : f.type,
+      "Content-Disposition": "inline",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; img-src 'self'; sandbox",
+      // a file never changes once uploaded, so the browser can keep it for a week
+      "Cache-Control": "private, max-age=604800, immutable",
+    });
+    stream.on("error", (err) => { console.error("preview failed:", err.message); res.destroy(); });
+    return stream.pipe(res);
   }
 
   // download / view or delete an attachment
@@ -224,6 +298,7 @@ async function handle(req, res, user, p) {
 
     if (req.method === "DELETE") {
       await s3.removeObject(BUCKET, f.key);
+      if (f.thumb) await s3.removeObject(BUCKET, thumbKey(f.key));
       q.delFile.run(f.id);
       q.touch.run(now(), f.note_id);
       return json(res, 200, { ok: true });

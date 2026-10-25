@@ -22,7 +22,7 @@ spec:
       containers:
         - name: frontend
           # CI replaces this line with image@sha256:<digest> after the first build.
-          image: ghcr.io/xtemplate24/transport-frontend@sha256:fd336c8b7f3510a24e911f7a489dbd86dce2670215e658bec4b269173d597c58
+          image: ghcr.io/xtemplate24/transport-frontend@sha256:0599dad23bd646ef0d773aa9ab0fd1c0ba1b6ac1e94dfceba9a639adf8ef04a9
           imagePullPolicy: IfNotPresent
           env:
             # Server-side calls only — never sent to the browser.

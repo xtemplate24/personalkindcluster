@@ -11,14 +11,14 @@
 /* ---------- expanding admin menu (signed-in only) ---------- */
 .menu {
   position: fixed;
-  top: clamp(14px, 3vw, 28px);
+  bottom: clamp(14px, 3vw, 28px);
   right: clamp(14px, 3vw, 28px);
   z-index: 10;
   animation: drop 450ms ease-out both;
 }
 
 @keyframes drop {
-  from { transform: translateY(-8px); }
+  from { transform: translateY(8px); }
   to   { transform: translateY(0); }
 }
 
@@ -60,7 +60,7 @@
 /* the panel that drops down (hidden until open) */
 .menu-panel {
   position: absolute;
-  top: calc(100% + 10px);
+  bottom: calc(100% + 10px);
   right: 0;
   min-width: 200px;
   padding: 10px;
@@ -75,9 +75,9 @@
   box-shadow: var(--glass-shadow);
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   backdrop-filter: blur(18px) saturate(140%);
-  transform-origin: top right;
+  transform-origin: bottom right;
   opacity: 0;
-  transform: scale(0.9) translateY(-6px);
+  transform: scale(0.9) translateY(6px);
   pointer-events: none;          /* can't click it while hidden */
   transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
@@ -317,6 +317,10 @@ h1 {
   .hero {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .page:has(.menu) {
+    padding-bottom: 96px;
   }
 
   .status {

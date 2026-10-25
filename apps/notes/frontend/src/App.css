@@ -33,6 +33,17 @@ p { margin: 0; }
 }
 
 /* ---------- buttons: glass pills (same as app3) ---------- */
+.back {
+  display: inline-block;
+  margin-bottom: 22px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.back:hover, .back:focus-visible { color: var(--accent); }
+
 button, input, textarea { font-family: inherit; }
 
 button, .icon-btn {

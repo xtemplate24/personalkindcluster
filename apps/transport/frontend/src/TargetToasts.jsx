@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, usePolling, useNow, countdown, serverNow } from "./lib.js";
+import { api, usePolling, useNow, countdown, serverNow, clockTime } from "./lib.js";
 import { BusIcon, TrainIcon, CloseIcon } from "./Icons.jsx";
 import { shortPlatform } from "./MrtView.jsx";
 
@@ -72,7 +72,7 @@ function BusToast({ target, onClose, onLabel }) {
     small = "Arriving now";
   } else {
     big = countdown(msLeft);
-    small = after ? `next after: ${Math.max(1, Math.floor((Date.parse(after.eta) - now) / 60000))} min` : "last estimate";
+    small = after ? `then ${Math.max(1, Math.floor((Date.parse(after.eta) - now) / 60000))} min` : "last estimate";
   }
 
   return (
@@ -80,6 +80,8 @@ function BusToast({ target, onClose, onLabel }) {
       icon={<BusIcon size={20} />}
       title={`Bus ${target.no}`}
       subtitle={target.stopName}
+      // LTA gives an exact timestamp, so this is the precise arrival time.
+      arrives={next ? clockTime(Date.parse(next.eta)) : null}
       big={big}
       small={small}
       urgency={urgency(msLeft)}
@@ -142,6 +144,8 @@ function TrainToast({ target, onClose, onLabel }) {
       icon={<TrainIcon size={20} />}
       title={dest ? `Train to ${dest}` : "Train"}
       subtitle={`${target.station} · Plat ${shortPlatform(target.platform)}`}
+      // Whole minutes only, so the clock time is approximate ("~").
+      arrives={msLeft === null ? null : `~${clockTime(now + msLeft)}`}
       big={big}
       small={small}
       urgency={urgency(msLeft)}
@@ -152,13 +156,18 @@ function TrainToast({ target, onClose, onLabel }) {
 
 const urgency = (ms) => (ms === null ? "idle" : ms <= 60_000 ? "now" : ms <= 3 * 60_000 ? "soon" : "later");
 
-function Toast({ icon, title, subtitle, big, small, urgency, onClose }) {
+function Toast({ icon, title, subtitle, arrives, big, small, urgency, onClose }) {
   return (
     <div className={`toast toast-${urgency}`}>
       <span className="toast-icon">{icon}</span>
       <span className="toast-text">
         <span className="toast-title">{title}</span>
         <span className="toast-sub">{subtitle}</span>
+        {arrives && (
+          <span className="toast-arrives">
+            ETA <strong>{arrives}</strong>
+          </span>
+        )}
       </span>
       <span className="toast-time">
         <span className="toast-big">{big}</span>

@@ -542,6 +542,18 @@ h1 {
   text-overflow: ellipsis;
 }
 
+.toast-arrives {
+  margin-top: 2px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toast-arrives strong { color: var(--accent); font-weight: 500; }
+.toast-soon .toast-arrives strong { color: var(--amber); }
+
 .toast-time { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
 .toast-big {
   font-family: "Space Grotesk", sans-serif;

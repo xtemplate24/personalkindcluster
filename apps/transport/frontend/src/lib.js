@@ -132,6 +132,15 @@ export function countdown(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// Clock time in Singapore, e.g. "3:59 pm". Always Singapore time, even if the
+// phone is set to another time zone (handy when travelling).
+const SG_TIME = new Intl.DateTimeFormat("en-SG", {
+  timeZone: "Asia/Singapore",
+  hour: "numeric",
+  minute: "2-digit",
+});
+export const clockTime = (ms) => (Number.isFinite(ms) ? SG_TIME.format(new Date(ms)) : null);
+
 // ---------------------------------------------------------------------------
 // MRT line colours (official LTA palette)
 // ---------------------------------------------------------------------------

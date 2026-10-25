@@ -22,7 +22,7 @@ spec:
       containers:
         - name: backend
           # CI replaces this line with image@sha256:<digest> after the first build.
-          image: ghcr.io/xtemplate24/transport-backend
+          image: ghcr.io/xtemplate24/transport-backend@sha256:1ac8ddae012f7835996bcd971ce1be27c9a982681caf3ba73ebebae2e3bfdf1d
           imagePullPolicy: IfNotPresent
           env:
             # LTA DataMall key, created by hand (never in git):

@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transport-backend
+  namespace: transport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transport-backend
+  template:
+    metadata:
+      labels:
+        app: transport-backend
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          # CI replaces this line with image@sha256:<digest> after the first build.
+          image: ghcr.io/xtemplate24/transport-backend
+          imagePullPolicy: IfNotPresent
+          env:
+            # LTA DataMall key, created by hand (never in git):
+            #   kubectl create secret generic transport-lta -n transport \
+            #     --from-literal=account-key='<your key>'
+            # optional: true = the pod still starts without it and falls back
+            # to the keyless BusRouter feeds (and no MRT disruption alerts).
+            - name: LTA_ACCOUNT_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: transport-lta
+                  key: account-key
+                  optional: true
+          ports:
+            - containerPort: 8080
+              name: api
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: api
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: api
+          resources:
+            # Holds the ~5,000 bus stops in memory, so a little more than app1.
+            requests: { cpu: 10m, memory: 48Mi }
+            limits: { cpu: 300m, memory: 192Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - emptyDir: {}
+          name: tmp

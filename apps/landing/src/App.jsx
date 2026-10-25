@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 
 const pub_apps = [
   { name: "Currency Converter", url: "https://app1.xtemplate.cc", label: "app1.xtemplate.cc" },
+  { name: "Bus & MRT timings", url: "https://transport.xtemplate.cc", label: "transport.xtemplate.cc" },
 ];
 
 const priv_apps = [

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: transport-frontend-svc
+  namespace: transport
+spec:
+  selector:
+    app: transport-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: transport-ingress
+  namespace: transport
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    # Deliberately NO router.middlewares annotation: this is a public app,
+    # so it is not behind oauth2-proxy. Visitors' data stays in their browser.
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - transport.xtemplate.cc
+  rules:
+    - host: transport.xtemplate.cc
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: transport-frontend-svc
+                port:
+                  name: http

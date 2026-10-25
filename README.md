@@ -17,6 +17,7 @@ login.
 |---|---|---|
 | `https://xtemplate.cc` | Landing page with links to everything below | No |
 | `https://app1.xtemplate.cc` | Currency converter (React frontend + Express backend, live rates or a custom rate) | See [gaps](#known-gaps--leftovers) |
+| `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed; saved stops and target bus/train in the browser's localStorage) | No (public) |
 | `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
 | `https://app3.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
 | `https://argocd.xtemplate.cc` | Argo CD UI | Yes |
@@ -36,7 +37,7 @@ flowchart LR
   cf -->|"outbound tunnel<br/>(no open ports)"| cfd["cloudflared pod"]
   cfd --> traefik["Traefik<br/>routes by hostname"]
   traefik -->|"ForwardAuth"| o2p["oauth2-proxy<br/>GitHub team check"]
-  traefik --> apps["landing / app1 / app2 / app3<br/>Argo CD / Headlamp"]
+  traefik --> apps["landing / app1 / app2 / app3 / transport<br/>Argo CD / Headlamp"]
 
   dev["git push to main"] --> gha["GitHub Actions<br/>build + Trivy scan + push to GHCR"]
   gha --> commit["bot commits new image digest<br/>into app-deployments/"]
@@ -83,7 +84,7 @@ flowchart LR
 
 | Path | What's in it |
 |---|---|
-| `apps/<app>/` | Source code + `Dockerfile` for each image (`landing`, `app1/{frontend,backend}`, `app2/{ui,llm}`, `app3/{frontend,backend}`) |
+| `apps/<app>/` | Source code + `Dockerfile` for each image (`landing`, `app1/{frontend,backend}`, `app2/{ui,llm}`, `app3/{frontend,backend}`, `transport/{frontend,backend}`) |
 | `app-deployments/<app>/` | Kubernetes manifests (namespace, deployment, service, ingress, PVC). **This is what Argo CD watches.** |
 | `platform/` | Cluster-wide pieces installed by hand: Helm values (Traefik, Argo CD, Trivy), `auth/` (oauth2-proxy + middlewares), `cloudflare/` (tunnel), `argocd/` and `headlamp/` ingresses |
 | `.github/workflows/` | `build-image.yaml` (reusable template), one caller per image, `create-lockfile.yaml`, weekly `cleanup-registry.yaml` |
@@ -123,6 +124,7 @@ Other workflows:
 - Secrets created by hand in the cluster, **never in git**:
   - `oauth2-proxy` in `auth` (GitHub client ID/secret + cookie secret)
   - `cloudflare-tunnel-secret` in `cloudflare` (tunnel token)
+  - `transport-lta` in `transport` (LTA DataMall account key, optional)
 
 **Workload hardening** (applied across the app deployments and oauth2-proxy)
 
@@ -143,7 +145,7 @@ Other workflows:
 **Exposure**
 
 - Nothing on the home network is port-forwarded. The only way in is the Cloudflare tunnel.
-- Everything except the landing page sits behind oauth2-proxy (with the app1 exception noted below).
+- Everything except the landing page and `transport` (public by design) sits behind oauth2-proxy (with the app1 exception noted below).
 
 ---
 
@@ -198,6 +200,30 @@ kubectl cp app3/$POD:/data/app3.db ./app3-backup-$(date +%F).db
 ```
 The first line finds the backend pod's name; the second copies the database file out of it into the
 current folder, with today's date in the name.
+
+---
+
+### The transport app (bus & MRT)
+
+`transport.xtemplate.cc` is public, so it stores nothing on the server: saved stops/stations (up to 10
+each) and the "target" bus/train live in each visitor's browser (`localStorage`). The backend only
+forwards and caches upstream data (15 s per stop/station) and rate-limits each visitor.
+
+| Data | Source | Key needed? |
+|---|---|---|
+| Bus stops + live bus arrivals | LTA DataMall (`v3/BusArrival`, `BusStops`) | Yes, free. Without it the app falls back to the community BusRouter feeds. |
+| MRT disruption alerts | LTA DataMall (`TrainServiceAlerts`) | Yes |
+| Live train times | SMRT's train-arrival feed (unofficial) | No. SMRT lines only: NSL, EWL, CCL, TEL, BPLRT |
+| Map | Leaflet + CARTO dark tiles, plus "Open in Google Maps" links | No |
+
+Add the LTA key (get one at datamall.lta.gov.sg, "Request for API Access"):
+
+```bash
+kubectl create secret generic transport-lta -n transport --from-literal=account-key='YOUR_KEY'
+kubectl rollout restart deployment/transport-backend -n transport
+```
+The first line stores the key as a Secret in the `transport` namespace; the second restarts the backend so
+it picks the key up.
 
 ---
 

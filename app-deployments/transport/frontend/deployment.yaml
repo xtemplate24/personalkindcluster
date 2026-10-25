@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transport-frontend
+  namespace: transport
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transport-frontend
+  template:
+    metadata:
+      labels:
+        app: transport-frontend
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          # CI replaces this line with image@sha256:<digest> after the first build.
+          image: ghcr.io/xtemplate24/transport-frontend
+          imagePullPolicy: IfNotPresent
+          env:
+            # Server-side calls only — never sent to the browser.
+            - name: BACKEND_URL
+              value: "http://transport-backend-svc.transport.svc.cluster.local:8080"
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { cpu: 200m, memory: 96Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - emptyDir: {}
+          name: tmp

@@ -118,6 +118,9 @@ function NoteList({ usage, onOpen }) {
     return s ? notes.filter((n) => `${n.title} ${n.preview}`.toLowerCase().includes(s)) : notes;
   }, [notes, search]);
 
+  const columnCount = useColumnCount();
+  const columns = useMemo(() => splitIntoColumns(shown, columnCount), [shown, columnCount]);
+
   const create = async () => {
     setCreating(true);
     try {
@@ -165,24 +168,66 @@ function NoteList({ usage, onOpen }) {
       )}
       {notes && notes.length > 0 && shown.length === 0 && <p className="muted center">Nothing matches “{search}”.</p>}
 
-      <ul className="list">
-        {shown.map((n, i) => (
-          <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
-            <button className="note-card" onClick={() => onOpen(n.id)}>
-              <span className="note-title">{n.title || "Untitled"}</span>
-              {n.preview.trim() && <span className="note-preview">{n.preview.replace(/\s+/g, " ").trim()}</span>}
-              <span className="note-meta">
-                <span>{fmtDate(n.updated)}</span>
-                {n.files > 0 && (
-                  <span className="pill"><Icon name="clip" size={13} /> {n.files}</span>
-                )}
-              </span>
-            </button>
-          </li>
+      <div className="masonry">
+        {columns.map((col, c) => (
+          <ul className="masonry-col" key={c}>
+            {col.map(({ note: n, i }) => (
+              <li key={n.id} style={{ "--i": Math.min(i, 12) }}>
+                <button className="note-card" onClick={() => onOpen(n.id)}>
+                  {n.cover && <img className="note-cover" src={`${API}/files/${n.cover}`} alt="" loading="lazy" />}
+                  <span className="note-text">
+                    <span className="note-title">{n.title || "Untitled"}</span>
+                    {previewOf(n) && <span className="note-preview">{previewOf(n)}</span>}
+                    <span className="note-meta">
+                      <span>{fmtDate(n.updated)}</span>
+                      {n.files > 0 && (
+                        <span className="pill"><Icon name="clip" size={13} /> {n.files}</span>
+                      )}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
         ))}
-      </ul>
+      </div>
     </div>
   );
+}
+
+// Keep line breaks, but squash runs of blank lines.
+const previewOf = (n) => n.preview.replace(/\n{3,}/g, "\n\n").trim();
+
+// Rough height of a card, so each note can go into whichever column is shorter.
+function estimateHeight(n) {
+  const lines = previewOf(n)
+    .split("\n")
+    .reduce((sum, line) => sum + Math.max(1, Math.ceil(line.length / 26)), 0);
+  return 70 + Math.min(lines, 8) * 21 + (n.cover ? 140 : 0);
+}
+
+// Two columns, or one on very narrow screens.
+function useColumnCount() {
+  const pick = () => (window.innerWidth < 360 ? 1 : 2);
+  const [count, setCount] = useState(pick);
+  useEffect(() => {
+    const onResize = () => setCount(pick());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return count;
+}
+
+// Deal notes out like Pinterest: newest first, each one into the shorter column.
+// (CSS "columns" would fill the whole left column first and break newest-first order.)
+function splitIntoColumns(notes, count) {
+  const cols = Array.from({ length: count }, () => ({ items: [], height: 0 }));
+  notes.forEach((note, i) => {
+    const shortest = cols.reduce((a, b) => (b.height < a.height ? b : a));
+    shortest.items.push({ note, i });
+    shortest.height += estimateHeight(note);
+  });
+  return cols.map((c) => c.items);
 }
 
 function UsageBar({ usage }) {

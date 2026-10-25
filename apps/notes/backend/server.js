@@ -62,8 +62,12 @@ db.exec(`
 
 const q = {
   list: db.prepare(`
-    SELECT n.id, n.title, substr(n.body, 1, 160) AS preview, n.updated,
-           (SELECT COUNT(*) FROM files f WHERE f.note_id = n.id) AS files
+    SELECT n.id, n.title, substr(n.body, 1, 400) AS preview, n.updated,
+           (SELECT COUNT(*) FROM files f WHERE f.note_id = n.id) AS files,
+           -- first image attached to the note, shown on its card in the list
+           (SELECT f.id FROM files f WHERE f.note_id = n.id
+              AND f.type IN ('image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif')
+              ORDER BY f.created LIMIT 1) AS cover
     FROM notes n WHERE n.user = ? ORDER BY n.updated DESC`),
   get: db.prepare("SELECT id, title, body, created, updated FROM notes WHERE id = ? AND user = ?"),
   add: db.prepare("INSERT INTO notes (id, user, title, body, created, updated) VALUES (?, ?, ?, ?, ?, ?)"),

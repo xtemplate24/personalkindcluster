@@ -1,0 +1,91 @@
+# MinIO = self-hosted S3 object storage for the attachments.
+#
+# The official minio/minio images are no longer published, so this uses
+# Chainguard's maintained build (small, non-root, regularly patched).
+#
+# Login details, created by hand once (never in git):
+#   kubectl create secret generic notes-minio -n notes \
+#     --from-literal=root-user=notesadmin \
+#     --from-literal=root-password="$(openssl rand -base64 24)"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-minio
+  namespace: notes
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate   # ReadWriteOnce volume: one pod at a time
+  selector:
+    matchLabels:
+      app: notes-minio
+  template:
+    metadata:
+      labels:
+        app: notes-minio
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: minio
+          # Chainguard's free tier only publishes "latest". Pin it to a digest
+          # (see the setup steps) so Argo doesn't silently change versions.
+          image: cgr.dev/chainguard/minio:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - server
+            - /data
+            - --address=:9000
+            - --certs-dir=/tmp/certs   # root filesystem is read-only
+          env:
+            - name: HOME
+              value: /tmp
+            - name: MINIO_BROWSER        # no web console; nothing exposes it anyway
+              value: "off"
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: notes-minio
+                  key: root-user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: notes-minio
+                  key: root-password
+          ports:
+            - containerPort: 9000
+              name: s3
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: s3
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: s3
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: "1", memory: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - mountPath: /data
+              name: data
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: notes-files
+        - emptyDir: {}
+          name: tmp

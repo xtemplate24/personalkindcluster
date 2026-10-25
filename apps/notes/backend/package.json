@@ -1,0 +1,13 @@
+{
+  "name": "notes-backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "minio": "^8.0.5"
+  }
+}

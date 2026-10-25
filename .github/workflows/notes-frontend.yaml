@@ -1,0 +1,25 @@
+name: notes-frontend-build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/notes/frontend/**"
+      - ".github/workflows/notes-frontend.yaml"
+      - ".github/workflows/build-image.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    permissions:
+      contents: write
+      packages: write
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      name: notes-frontend
+      context: apps/notes/frontend
+      manifest: app-deployments/notes/frontend/deployment.yaml
+      

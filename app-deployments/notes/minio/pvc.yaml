@@ -1,0 +1,12 @@
+# Holds the uploaded files. local-path does NOT enforce this size (it's just
+# a folder on the NVMe), so the real limit is QUOTA_MB in the backend.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notes-files
+  namespace: notes
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi

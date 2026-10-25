@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-backend
+  namespace: notes
+spec:
+  replicas: 1
+  # ReadWriteOnce volume + SQLite = only one pod may use it at a time,
+  # so stop the old pod before starting the new one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: notes-backend
+  template:
+    metadata:
+      labels:
+        app: notes-backend
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          # The build-image pipeline fills in the @sha256 digest after the first push.
+          image: ghcr.io/xtemplate24/notes-backend
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DB_PATH
+              value: /data/notes.db
+            - name: MINIO_HOST
+              value: notes-minio-svc
+            - name: MINIO_PORT
+              value: "9000"
+            - name: MINIO_BUCKET
+              value: notes
+            - name: MAX_FILE_MB      # per file
+              value: "50"
+            - name: QUOTA_MB         # all files per user (local-path volumes have no size limit of their own)
+              value: "20480"
+            # Same secret MinIO uses, created by hand (never in git), see minio/deployment.yaml
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: notes-minio
+                  key: root-user
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: notes-minio
+                  key: root-password
+          ports:
+            - containerPort: 8080
+              name: api
+          # /healthz only says "ready" once MinIO answers and the bucket exists.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: api
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: api
+          resources:
+            # A 50 MB upload is held in memory briefly before going to MinIO.
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - mountPath: /data
+              name: data
+            - mountPath: /tmp
+              name: tmp
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: notes-db
+        - emptyDir: {}
+          name: tmp

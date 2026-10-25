@@ -1,0 +1,13 @@
+# Holds the SQLite database (note text + file list). Small.
+# k3s's built-in "local-path" storage class creates it under
+# /var/lib/rancher/k3s/storage on the EliteDesk's NVMe.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notes-db
+  namespace: notes
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi

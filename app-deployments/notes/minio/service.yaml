@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-minio-svc
+  namespace: notes
+spec:
+  # ClusterIP (internal only). No ingress points here.
+  selector:
+    app: notes-minio
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: s3

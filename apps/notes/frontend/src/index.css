@@ -1,0 +1,177 @@
+/* =====================================================================
+   notes — aurora background + liquid glass (same recipe as landing)
+   Every colour lives in the :root block below. Edit it there only.
+   ===================================================================== */
+
+:root {
+  /* ---------- palette ---------- */
+  --bg: #05090b;
+  --text: #e8ecea;
+  --text-strong: #f4f6f5;
+  --text-soft: #b7c3c5;
+  --muted: #8ea3a7;
+
+  /* accent: the "rgb" versions let us write rgba(var(--accent-rgb), 0.3) */
+  --accent-rgb: 103, 232, 249;          /* cyan (#67e8f9) */
+  --accent-light-rgb: 165, 243, 252;    /* lighter cyan for highlights */
+  --accent: rgb(var(--accent-rgb));
+
+  --on-accent: #101a1c;                 /* text colour on accent buttons */
+  --accent-grad: linear-gradient(135deg, rgba(var(--accent-light-rgb), 0.95), rgba(var(--accent-rgb), 0.75));
+  --accent-grad-hover: linear-gradient(135deg, rgba(var(--accent-light-rgb), 1), rgba(var(--accent-rgb), 0.9));
+
+  --teal: #6fd6c4;
+  --amber: #f2a65a;
+
+  --danger-rgb: 224, 122, 107;
+  --danger: rgb(var(--danger-rgb));
+  --danger-solid: #c4493c;
+  --danger-solid-hover: #d6554a;
+  --on-danger: #fff;
+
+  --white-rgb: 255, 255, 255;
+  --black-rgb: 0, 0, 0;
+
+  /* aurora blobs (r, g, b) */
+  --aurora-1: var(--accent-rgb);
+  --aurora-2: 143, 168, 255;   /* blue */
+  --aurora-3: 181, 140, 240;   /* violet */
+  --aurora-4: 224, 122, 159;   /* pink */
+  --aurora-5: 111, 214, 196;   /* teal */
+  --noise-opacity: 0.09;       /* 0 = no grain, 0.15 = very grainy */
+
+  /* ---------- shapes ---------- */
+  --btn-radius: 20px;
+  --panel-radius: 22px;
+  --field-radius: 16px;
+
+  /* ---------- the liquid-glass recipe ---------- */
+  --glass-bg: linear-gradient(145deg, rgba(var(--white-rgb), 0.11), rgba(var(--white-rgb), 0.03));
+  --glass-bg-hover: linear-gradient(145deg, rgba(var(--white-rgb), 0.17), rgba(var(--white-rgb), 0.06));
+  --glass-border: 1px solid rgba(var(--white-rgb), 0.15);
+  --glass-border-hover: rgba(var(--white-rgb), 0.3);
+  --glass-blur: saturate(100%);
+  --glass-shadow:
+    inset 0 1px 0 rgba(var(--white-rgb), 0.32),
+    inset 0 -1px 0 rgba(var(--white-rgb), 0.05),
+    0 10px 30px rgba(var(--black-rgb), 0.35);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+
+html {
+  background:
+    radial-gradient(90% 60% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(90% 60% at 100% 100%, color-mix(in srgb, var(--teal) 14%, transparent), transparent 70%),
+    var(--bg);
+  background-repeat: no-repeat;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- aurora background ----------
+   Three fixed layers, each holding two soft glows. Every layer moves on its
+   own slow loop (47s, 61s, 83s) and "breathes" on another (19s, 29s, 37s).
+   Because the loop lengths don't line up, the combined motion takes minutes
+   to repeat and looks random. Only transform + opacity are animated, so it
+   runs on the GPU and stays smooth.                                        */
+html::before,
+html::after,
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+html::before {
+  background:
+    radial-gradient(60% 26% at 30% 30%, rgba(var(--aurora-1), 0.34), transparent 70%),
+    radial-gradient(40% 40% at 75% 70%, rgba(var(--aurora-2), 0.26), transparent 70%);
+  animation: wanderA 47s ease-in-out infinite alternate, breatheA 19s ease-in-out infinite alternate;
+}
+html::after {
+  background:
+    radial-gradient(55% 24% at 70% 25%, rgba(var(--aurora-3), 0.30), transparent 70%),
+    radial-gradient(38% 38% at 20% 75%, rgba(var(--aurora-4), 0.22), transparent 70%);
+  animation: wanderB 61s ease-in-out infinite alternate-reverse, breatheB 29s ease-in-out infinite alternate;
+  animation-delay: -18s, -7s;
+}
+body::before {
+  background:
+    radial-gradient(50% 22% at 55% 55%, rgba(var(--aurora-5), 0.26), transparent 70%),
+    radial-gradient(30% 30% at 85% 15%, rgba(var(--aurora-1), 0.20), transparent 70%);
+  animation: wanderC 83s ease-in-out infinite alternate, breatheC 37s ease-in-out infinite alternate;
+  animation-delay: -41s, -12s;
+}
+
+/* Phones / portrait screens: make the glow layers a big centred square so
+   their corners never swing into view when the animation rotates them. */
+@media (orientation: portrait) {
+  html::before,
+  html::after,
+  body::before {
+    inset: auto;                       /* cancel the -25% sizing */
+    top: 50%;
+    left: 50%;
+    width: 200vmax;                    /* vmax = 1% of the screen's longer side */
+    height: 200vmax;
+    margin: -100vmax 0 0 -100vmax;     /* pull it back by half, so it's centred */
+  }
+}
+
+/* film grain: a tiny generated noise tile, laid over the glows */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--noise-opacity);
+  mix-blend-mode: overlay;
+  background-size: 220px 220px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes wanderA {
+  0%   { transform: translate3d(-6%, 4%, 0)  rotate(-8deg) scale(1); }
+  22%  { transform: translate3d(5%, -7%, 0)  rotate(4deg)  scale(1.12); }
+  47%  { transform: translate3d(9%, 6%, 0)   rotate(11deg) scale(0.96); }
+  71%  { transform: translate3d(-4%, 10%, 0) rotate(-3deg) scale(1.15); }
+  100% { transform: translate3d(3%, -5%, 0)  rotate(7deg)  scale(1.04); }
+}
+@keyframes wanderB {
+  0%   { transform: translate3d(7%, -6%, 0)  rotate(10deg)  scale(1.1); }
+  18%  { transform: translate3d(-8%, 3%, 0)  rotate(-6deg)  scale(0.97); }
+  44%  { transform: translate3d(2%, 9%, 0)   rotate(-12deg) scale(1.18); }
+  68%  { transform: translate3d(10%, 1%, 0)  rotate(5deg)   scale(1); }
+  100% { transform: translate3d(-5%, -8%, 0) rotate(-2deg)  scale(1.08); }
+}
+@keyframes wanderC {
+  0%   { transform: translate3d(0, 8%, 0)    rotate(6deg)   scale(1.05); }
+  27%  { transform: translate3d(-9%, -3%, 0) rotate(-9deg)  scale(1.16); }
+  52%  { transform: translate3d(6%, -9%, 0)  rotate(3deg)   scale(0.95); }
+  79%  { transform: translate3d(8%, 5%, 0)   rotate(-5deg)  scale(1.1); }
+  100% { transform: translate3d(-7%, 2%, 0)  rotate(12deg)  scale(1); }
+}
+@keyframes breatheA { 0% { opacity: 0.55; } 35% { opacity: 1; }    60% { opacity: 0.7; }  100% { opacity: 0.95; } }
+@keyframes breatheB { 0% { opacity: 1; }    30% { opacity: 0.5; }  65% { opacity: 0.9; }  100% { opacity: 0.6; } }
+@keyframes breatheC { 0% { opacity: 0.7; }  40% { opacity: 0.45; } 70% { opacity: 1; }    100% { opacity: 0.8; } }
+
+/* ---------- accessibility ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

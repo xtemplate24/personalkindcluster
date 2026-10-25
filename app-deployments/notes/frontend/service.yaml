@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-frontend-svc
+  namespace: notes
+spec:
+  selector:
+    app: notes-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

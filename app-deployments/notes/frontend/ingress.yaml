@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: notes-ingress
+  namespace: notes
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: >-
+      auth-oauth2-proxy-errors@kubernetescrd,
+      auth-oauth2-proxy-auth@kubernetescrd
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - notes.xtemplate.cc
+  rules:
+    - host: notes.xtemplate.cc
+      http:
+        paths:
+          # /api (incl. uploads) goes straight to the backend, never through nginx.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: notes-backend-svc
+                port:
+                  name: api
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: notes-frontend-svc
+                port:
+                  name: http

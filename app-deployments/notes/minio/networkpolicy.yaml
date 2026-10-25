@@ -1,0 +1,20 @@
+# Only the notes backend may talk to MinIO. Any other pod in the cluster
+# (or anything that sneaks in) is refused. k3s enforces NetworkPolicy out of the box.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-only-from-backend
+  namespace: notes
+spec:
+  podSelector:
+    matchLabels:
+      app: notes-minio
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: notes-backend
+      ports:
+        - protocol: TCP
+          port: 9000

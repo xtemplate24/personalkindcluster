@@ -64,6 +64,7 @@ function AppIcon({ app, i }) {
 const admin_links = [
   { name: "Console", url: "https://console.xtemplate.cc" },
   { name: "Argo CD", url: "https://argocd.xtemplate.cc" },
+  { name: "Grafana", url: "https://grafana.xtemplate.cc" },
 ];
 
 export default function App() {

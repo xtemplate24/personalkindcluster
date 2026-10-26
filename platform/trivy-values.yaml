@@ -8,3 +8,6 @@ operator:
 trivy:
   severity: CRITICAL,HIGH
   ignoreUnfixed: true
+
+serviceMonitor:
+  enabled: true

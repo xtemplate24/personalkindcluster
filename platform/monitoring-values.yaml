@@ -19,10 +19,32 @@ prometheus:
 
 alertmanager:
   alertmanagerSpec:
+    secrets:
+      - alertmanager-discord 
     retention: 120h            # 5 days
     resources:
       requests: { cpu: 10m, memory: 64Mi }
       limits: { memory: 128Mi }
+  config:
+    route:
+      receiver: discord          # everything goes to Discord by default...
+      group_by: ['alertname', 'namespace']
+      group_wait: 30s            # wait 30s to batch related alerts together
+      group_interval: 5m
+      repeat_interval: 12h       # re-send an unresolved alert every 12h, not constantly
+      routes:
+        - receiver: 'null'       # ...except these, which are dropped
+          matchers: ['alertname = "Watchdog"']        # a heartbeat that fires all the time on purpose
+        - receiver: 'null'
+          matchers: ['alertname = "InfoInhibitor"']
+        - receiver: 'null'
+          matchers: ['severity = "info"']             # low-priority noise
+    receivers:
+      - name: 'null'
+      - name: discord
+        discord_configs:
+          - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
+            send_resolved: true  # also tell you when it's fixed
 
 grafana:
   admin:

@@ -134,10 +134,10 @@ function NoteList({ usage, onOpen }) {
 
   return (
     <div className="screen">
+      <a className="home-link" href="https://xtemplate.cc">
+        <Icon name="back" size={14} /> xtemplate.cc
+      </a>
       <header className="top">
-        <a className="back" href="https://xtemplate.cc">
-            ← xtemplate.ccs
-        </a>
         <div>
           <h1>Notes</h1>
           <p className="muted small">Your notes and files, stored on the home lab.</p>

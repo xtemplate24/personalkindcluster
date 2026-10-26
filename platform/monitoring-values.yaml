@@ -1,0 +1,40 @@
+prometheus:
+  prometheusSpec:
+    retention: 5d              # delete data older than 5 days
+    retentionSize: 8GB         # or once it hits 8 GB, whichever comes first
+    scrapeInterval: 60s        # collect every 60s (default 30s) - half the writes
+    serviceMonitorSelectorNilUsesHelmValues: false  # find monitors in any namespace
+    podMonitorSelectorNilUsesHelmValues: false
+    resources:
+      requests: { cpu: 100m, memory: 512Mi }
+      limits: { memory: 1536Mi }
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+alertmanager:
+  alertmanagerSpec:
+    retention: 120h            # 5 days
+    resources:
+      requests: { cpu: 10m, memory: 64Mi }
+      limits: { memory: 128Mi }
+
+grafana:
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  persistence:
+    enabled: false             # dashboards come from the chart, nothing to save
+
+# k3s bundles these components into one process, so the chart can't scrape
+# them separately. Leaving them on just produces permanent "target down" alerts.
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeEtcd: { enabled: false }

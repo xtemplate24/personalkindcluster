@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: architecture-svc
+  namespace: architecture
+spec:
+  selector:
+    app: architecture
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

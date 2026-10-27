@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 const pub_apps = [
   { name: "Currency Converter", url: "https://app1.xtemplate.cc", icon: "currency", tint: "103, 232, 249" },
   { name: "Bus & MRT", url: "https://transport.xtemplate.cc", icon: "bus", tint: "242, 166, 90" },
+  { name: "Architecture", url: "https://architecture.xtemplate.cc", icon: "diagram", tint: "111, 214, 196" },
 ];
 
 const priv_apps = [
@@ -35,6 +36,14 @@ const icons = {
       <circle cx="8.5" cy="12" r="0.9" fill="currentColor" />
       <circle cx="12.25" cy="12" r="0.9" fill="currentColor" />
       <circle cx="16" cy="12" r="0.9" fill="currentColor" />
+    </>
+  ),
+  diagram: (
+    <>
+      <rect x="9" y="3" width="6" height="5" rx="1.5" />
+      <rect x="3" y="16" width="6" height="5" rx="1.5" />
+      <rect x="15" y="16" width="6" height="5" rx="1.5" />
+      <path d="M12 8v4M6 16v-4h12v4" />
     </>
   ),
   dumbbell: <path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11" />,

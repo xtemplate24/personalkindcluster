@@ -18,6 +18,7 @@ login.
 | `https://xtemplate.cc` | Landing page with links to everything below | No |
 | `https://app1.xtemplate.cc` | Currency converter (React frontend + Express backend, live rates or a custom rate) | See [gaps](#known-gaps--leftovers) |
 | `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed + CARTO map tiles; saved stops and target bus/train in the browser's localStorage) | No (public) |
+| `https://architecture.xtemplate.cc` | Interactive architecture diagram of this lab (frontend only, static React build on nginx; content lives in `apps/architecture/src/data.js`) | No (public) |
 | `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
 | `https://app3.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
 | `https://argocd.xtemplate.cc` | Argo CD UI | Yes |
@@ -84,7 +85,7 @@ flowchart LR
 
 | Path | What's in it |
 |---|---|
-| `apps/<app>/` | Source code + `Dockerfile` for each image (`landing`, `app1/{frontend,backend}`, `app2/{ui,llm}`, `app3/{frontend,backend}`, `transport/{frontend,backend}`) |
+| `apps/<app>/` | Source code + `Dockerfile` for each image (`landing`, `app1/{frontend,backend}`, `app2/{ui,llm}`, `app3/{frontend,backend}`, `transport/{frontend,backend}`, `architecture`) |
 | `app-deployments/<app>/` | Kubernetes manifests (namespace, deployment, service, ingress, PVC). **This is what Argo CD watches.** |
 | `platform/` | Cluster-wide pieces installed by hand: Helm values (Traefik, Argo CD, Trivy), `auth/` (oauth2-proxy + middlewares), `cloudflare/` (tunnel), `argocd/` and `headlamp/` ingresses |
 | `.github/workflows/` | `build-image.yaml` (reusable template), one caller per image, `create-lockfile.yaml`, weekly `cleanup-registry.yaml` |
@@ -146,7 +147,7 @@ Other workflows:
 **Exposure**
 
 - Nothing on the home network is port-forwarded. The only way in is the Cloudflare tunnel.
-- Everything except the landing page and `transport` (public by design) sits behind oauth2-proxy (with the app1 exception noted below).
+- Everything except the landing page, `transport` and `architecture` (public by design) sits behind oauth2-proxy (with the app1 exception noted below).
 
 ---
 

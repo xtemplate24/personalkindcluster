@@ -178,6 +178,32 @@ function Tile({ icon, name, sub, tint = ACCENT, i = 0, onClick, disabled }) {
   );
 }
 
+// Four phone-style signal bars. Filled bars take the exercise colour, the rest stay grey.
+function SignalBars({ bars }) {
+  const heights = [4, 7, 10, 14];
+  return (
+    <svg className="signal" viewBox="0 0 20 16" role="img" aria-label={`${bars} of 4 bars`}>
+      {heights.map((h, k) => (
+        <rect key={k} className={k < bars ? "on" : "off"} x={1 + k * 5} y={15 - h} width="3" height={h} rx="1" />
+      ))}
+    </svg>
+  );
+}
+
+// Exercise tile on the home screen: signal bars instead of an icon circle.
+// "least" marks the exercise done the fewest times (amber outline + amber sub line).
+function SignalTile({ name, sub, tint, bars, least, i = 0, onClick }) {
+  return (
+    <button className={`tile signal-tile${least ? " least" : ""}`} style={{ "--tint": tint, "--i": i }} onClick={onClick}>
+      <SignalBars bars={bars} />
+      <span className="tile-text">
+        <span className="tile-name">{name}</span>
+        <span className="tile-sub">{sub}</span>
+      </span>
+    </button>
+  );
+}
+
 // Header used inside an exercise: back pill, big title, optional badges
 function SubHead({ backLabel, onBack, title, children }) {
   return (
@@ -243,6 +269,15 @@ export default function App() {
 
   const all = [...DEFAULTS, ...data.custom];
   const tintOf = (n) => rgb(COLORS[Math.max(0, all.indexOf(n)) % COLORS.length]);
+  // How many sessions each exercise has (assessment + training + ad-hoc all count)
+  const counts = Object.fromEntries(all.map((n) => [n, data.sessions.filter((s) => s.exercise === n).length]));
+  const topCount = Math.max(0, ...Object.values(counts));
+  const leastCount = Math.min(...Object.values(counts));
+  // Bars are relative to the most-done exercise: it gets 4, the rest get their share (rounded up).
+  // 0 sessions = 0 bars (all grey), anything logged gets at least 1.
+  const barsFor = (c) => (c === 0 || topCount === 0 ? 0 : Math.max(1, Math.ceil((c / topCount) * 4)));
+  // Only highlight the least-done one when there is something to compare (not all equal)
+  const flagLeast = topCount > leastCount;
   const max = exercise ? latestMax(data.sessions, exercise) : null;
   const plan = exercise ? data.plans.find((p) => p.exercise === exercise) || null : null;
   const toMode = () => setScreen("mode");
@@ -272,24 +307,26 @@ export default function App() {
       <main key={screen} className="view">
         {screen === "home" && (
           <>
-            <section className="layer">
+            <section className="plain">
               <h2 className="layer-label">Pick an exercise</h2>
               <div className="tiles">
                 {all.map((n, i) => {
                   const m = latestMax(data.sessions, n);
+                  const c = counts[n];
+                  const s = c === 0 ? "not started" : `${c} session${c === 1 ? "" : "s"}`;
                   return (
-                    <Tile key={n} i={i} icon="dumbbell" name={n} tint={tintOf(n)}
-                      sub={m === null ? "no max yet" : `max ${m} reps`}
+                    <SignalTile key={n} i={i} name={n} tint={tintOf(n)} bars={barsFor(c)} least={flagLeast && c === leastCount}
+                      sub={m === null ? s : `${s} · max ${m}`}
                       onClick={() => { setExercise(n); setScreen("mode"); }} />
                   );
                 })}
               </div>
             </section>
 
-            <section className="layer dashed">
+            <section className="plain">
               <h2 className="layer-label">Add a custom exercise</h2>
               <div className="row">
-                <input value={newName} maxLength={30} placeholder="e.g. Burpees" onChange={(e) => setNewName(e.target.value)}
+                <input value={newName} maxLength={30} placeholder="e.g. Burpees" aria-label="Custom exercise name" onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addCustom()} />
                 <button className="primary" onClick={addCustom}>Add</button>
               </div>

@@ -481,6 +481,18 @@ input:focus {
   color: var(--muted);
 }
 
+/* ---------- home: sections without a panel behind them ---------- */
+.plain { padding: 0; }
+.plain + .plain { margin-top: 8px; }
+
+/* ---------- signal bars (sessions per exercise, relative to the most-done one) ---------- */
+.signal-tile { gap: 12px; padding: 10px 12px; }
+.signal { flex: none; width: 26px; height: 22px; margin-left: 2px; }
+.signal rect.on { fill: rgb(var(--tint)); }
+.signal rect.off { fill: rgba(var(--white-rgb), 0.18); }
+.signal-tile.least { border-color: rgba(242, 166, 90, 0.55); }
+.signal-tile.least .tile-sub { color: var(--amber); }
+
 /* ---------- badges under a title ---------- */
 .badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .badge {

@@ -257,10 +257,6 @@ export default function App() {
             xtemplate.cc
           </a>
           <h1>Workout</h1>
-          <p className="lede">
-            Test your max, train from a plan, and log extra reps. Everything is saved, so it is still here next time
-            you sign in.
-          </p>
           <div className="tabs" role="tablist" aria-label="Section">
             <button role="tab" aria-selected={screen === "home"} className={`tab ${screen === "home" ? "on" : ""}`} onClick={() => setScreen("home")}>
               Exercises
@@ -336,12 +332,6 @@ export default function App() {
         {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onDeleteExercise={deleteExercise} onBack={toMode} />}
         {screen === "stats" && <Stats sessions={data.sessions} custom={data.custom} onDelete={deleteAll} />}
       </main>
-
-      {top && (
-        <footer className="footer">
-          <span>Self-hosted on k3s. Data lives on a persistent volume.</span>
-        </footer>
-      )}
     </div>
   );
 }

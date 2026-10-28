@@ -537,7 +537,7 @@ input:focus {
 
 /* ---------- timers ---------- */
 .clock {
-  font-family: "NType", "IBM Plex Mono", monospace;
+  font-family: "Space Grotesk", sans-serif, monospace;
   font-size: clamp(5rem, 22vw, 7rem);
   line-height: 1;
   text-align: center;

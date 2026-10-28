@@ -555,13 +555,13 @@ input:focus {
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .ring circle { fill: none; stroke-width: 7; }
 .ring-bg { stroke: rgba(var(--white-rgb), 0.1); }
-.ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.6)); }
+.ring-fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 5px rgba(var(--accent-rgb), 0.4)); }
 .ring-time {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  font-family: "NType", "IBM Plex Mono", monospace;
+  font-family: "Space Grotesk", sans-serif, monospace;
   font-size: 2.8rem;
   color: var(--text-strong);
   font-variant-numeric: tabular-nums;

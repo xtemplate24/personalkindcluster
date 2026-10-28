@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Icon from "./Icons.jsx";
 
 const API = `${import.meta.env.BASE_URL}api`;
 const DEFAULTS = ["Push ups", "Pull ups", "Crunches", "Squats"];
@@ -154,6 +155,43 @@ function chime() {
 }
 
 
+// "#67e8f9" -> "103, 232, 249" so CSS can do rgba(var(--tint), 0.3)
+const rgb = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+};
+const ACCENT = "103, 232, 249";
+const TEAL = "111, 214, 196";
+const VIOLET = "181, 140, 240";
+const AMBER = "242, 166, 90";
+
+// One clickable glass tile: round icon on the left, name + small line under it
+function Tile({ icon, name, sub, tint = ACCENT, i = 0, onClick, disabled }) {
+  return (
+    <button className="tile" style={{ "--tint": tint, "--i": i }} onClick={onClick} disabled={disabled}>
+      <span className="tile-icon"><Icon name={icon} /></span>
+      <span className="tile-text">
+        <span className="tile-name">{name}</span>
+        {sub && <span className="tile-sub">{sub}</span>}
+      </span>
+    </button>
+  );
+}
+
+// Header used inside an exercise: back pill, big title, optional badges
+function SubHead({ backLabel, onBack, title, children }) {
+  return (
+    <header className="top">
+      <button className="back" onClick={onBack}>
+        <Icon name="back" />
+        {backLabel}
+      </button>
+      <h1>{title}</h1>
+      {children && <div className="badges">{children}</div>}
+    </header>
+  );
+}
+
 export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -203,65 +241,107 @@ export default function App() {
   if (error) return <div className="page"><p className="error">{error} — try reloading.</p></div>;
   if (!data) return <div className="page"><div className="spinner" /></div>;
 
+  const all = [...DEFAULTS, ...data.custom];
+  const tintOf = (n) => rgb(COLORS[Math.max(0, all.indexOf(n)) % COLORS.length]);
   const max = exercise ? latestMax(data.sessions, exercise) : null;
   const plan = exercise ? data.plans.find((p) => p.exercise === exercise) || null : null;
+  const toMode = () => setScreen("mode");
+  const top = screen === "home" || screen === "stats";
 
   return (
     <div className="page">
-      <nav className="nav">
-        <button className={screen !== "stats" ? "tab on" : "tab"} onClick={() => setScreen("home")}>Exercises</button>
-        <button className={screen === "stats" ? "tab on" : "tab"} onClick={() => setScreen("stats")}>My stats</button>
-      </nav>
+      {top && (
+        <header className="top">
+          <a className="back" href="https://xtemplate.cc">
+            <Icon name="back" />
+            xtemplate.cc
+          </a>
+          <h1>Workout</h1>
+          <p className="lede">
+            Test your max, train from a plan, and log extra reps. Everything is saved, so it is still here next time
+            you sign in.
+          </p>
+          <div className="tabs" role="tablist" aria-label="Section">
+            <button role="tab" aria-selected={screen === "home"} className={`tab ${screen === "home" ? "on" : ""}`} onClick={() => setScreen("home")}>
+              Exercises
+            </button>
+            <button role="tab" aria-selected={screen === "stats"} className={`tab ${screen === "stats" ? "on" : ""}`} onClick={() => setScreen("stats")}>
+              My stats
+            </button>
+            <span className={`tab-pill ${screen === "stats" ? "right" : ""}`} aria-hidden="true" />
+          </div>
+        </header>
+      )}
 
-      <div key={screen} className="screen">
+      <main key={screen} className="view">
         {screen === "home" && (
-          <section>
-            <h1>Pick an exercise</h1>
-            <div className="grid">
-              {[...DEFAULTS, ...data.custom].map((n, i) => (
-                <button key={n} style={{ "--i": i }} className="big" onClick={() => { setExercise(n); setScreen("mode"); }}>{n}</button>
-              ))}
-            </div>
-            <h2>Custom</h2>
-            <div className="row">
-              <input value={newName} maxLength={30} placeholder="e.g. Burpees" onChange={(e) => setNewName(e.target.value)} />
-              <button className="primary" onClick={addCustom}>Add</button>
-            </div>
-          </section>
+          <>
+            <section className="layer">
+              <h2 className="layer-label">Pick an exercise</h2>
+              <div className="tiles">
+                {all.map((n, i) => {
+                  const m = latestMax(data.sessions, n);
+                  return (
+                    <Tile key={n} i={i} icon="dumbbell" name={n} tint={tintOf(n)}
+                      sub={m === null ? "no max yet" : `max ${m} reps`}
+                      onClick={() => { setExercise(n); setScreen("mode"); }} />
+                  );
+                })}
+              </div>
+            </section>
+
+            <section className="layer dashed">
+              <h2 className="layer-label">Add a custom exercise</h2>
+              <div className="row">
+                <input value={newName} maxLength={30} placeholder="e.g. Burpees" onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addCustom()} />
+                <button className="primary" onClick={addCustom}>Add</button>
+              </div>
+            </section>
+          </>
         )}
 
         {screen === "mode" && (
-          <section>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" ,marginTop: "2rem"}}>
-              <h1 style={{ margin: 0 }}>{exercise}</h1>
-              <button 
-                className="secondary-btn" /* Feel free to swap with an existing small button class */
-                onClick={() => setScreen("plan")}
-                style={{ padding: "0.5rem 1rem", cursor: "pointer" }}
-              >
-                {plan ? "Change plan" : "Set training plan"}
-              </button>
-            </div>
-            <p className="muted">
-              {max === null ? "No assessment yet." : `Current max: ${max} reps`}
-              {" · "}
-              {plan ? `Plan: ${plan.sets} set${plan.sets > 1 ? "s" : ""}, rest ${fmt(plan.rest)}` : "No training plan set."}
-            </p>
-            <div className="grid">
-              <button style={{ "--i": 0 }} className="big" onClick={() => setScreen("assess")}>Assessment</button>
-              <button style={{ "--i": 1 }} className="big" disabled={!plan && max === null} onClick={() => setScreen("train")}>Daily training</button>
-              <button style={{ "--i": 3 }} className="big" onClick={() => setScreen("adhoc")}>Ad-hoc</button>
-            </div>
-            {!plan && max === null && <p className="muted">Set a training plan or do an assessment to unlock daily training.</p>}
-          </section>
+          <>
+            <SubHead backLabel="Exercises" onBack={() => setScreen("home")} title={exercise}>
+              <span className="badge" style={{ "--tint": tintOf(exercise) }}>
+                {max === null ? "no assessment yet" : `max ${max} reps`}
+              </span>
+              <span className="badge badge-mono">
+                {plan ? `plan: ${plan.sets} set${plan.sets > 1 ? "s" : ""} · rest ${fmt(plan.rest)}` : "no training plan"}
+              </span>
+            </SubHead>
+
+            <section className="layer">
+              <h2 className="layer-label">Choose a mode</h2>
+              <div className="tiles modes">
+                <Tile i={0} icon="target" name="Assessment" sub="3, 2, 1, then max reps" onClick={() => setScreen("assess")} />
+                <Tile i={1} icon="repeat" name="Daily training" tint={TEAL}
+                  sub={plan ? "follows your plan" : max !== null ? "recommended from your max" : "needs a plan or an assessment"}
+                  disabled={!plan && max === null} onClick={() => setScreen("train")} />
+                <Tile i={2} icon="plus" name="Ad-hoc" tint={VIOLET} sub="log extra reps" onClick={() => setScreen("adhoc")} />
+              </div>
+            </section>
+
+            <button className="pill-btn" onClick={() => setScreen("plan")}>
+              <Icon name="list" />
+              {plan ? "Change training plan" : "Set training plan"}
+            </button>
+          </>
         )}
 
-        {screen === "assess" && <Assessment exercise={exercise} onSave={save} onBack={() => setScreen("mode")} />}
-        {screen === "train" && <Training exercise={exercise} max={max} plan={plan} onSave={save} onBack={() => setScreen("mode")} />}
-        {screen === "adhoc" && <AdHoc exercise={exercise} onSave={save} onBack={() => setScreen("mode")} />}
-        {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onDeleteExercise={deleteExercise} onBack={() => setScreen("mode")} />}
+        {screen === "assess" && <Assessment exercise={exercise} onSave={save} onBack={toMode} />}
+        {screen === "train" && <Training exercise={exercise} max={max} plan={plan} onSave={save} onBack={toMode} />}
+        {screen === "adhoc" && <AdHoc exercise={exercise} onSave={save} onBack={toMode} />}
+        {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onDeleteExercise={deleteExercise} onBack={toMode} />}
         {screen === "stats" && <Stats sessions={data.sessions} custom={data.custom} onDelete={deleteAll} />}
-      </div>
+      </main>
+
+      {top && (
+        <footer className="footer">
+          <span>Self-hosted on k3s. Data lives on a persistent volume.</span>
+        </footer>
+      )}
     </div>
   );
 }
@@ -276,7 +356,7 @@ function Stepper({ value, onChange, min, max, step = 1, display }) {
   );
 }
 
-function PlanEditor({ exercise, plan, max, onSave, onBack, onDeleteExercise  }) {
+function PlanEditor({ exercise, plan, max, onSave, onBack, onDeleteExercise }) {
   const [sets, setSets] = useState(plan?.sets ?? 3);
   const [reps, setReps] = useState(() => {
     const r = (plan?.reps ?? []).map(String);
@@ -298,46 +378,45 @@ function PlanEditor({ exercise, plan, max, onSave, onBack, onDeleteExercise  }) 
   };
 
   return (
-    <section>
-      <h1>{exercise} — training plan</h1>
+    <>
+      <SubHead backLabel={exercise} onBack={onBack} title="Training plan" />
 
-      <div className="reco">
+      <section className="layer dashed">
+        <h2 className="layer-label">Recommendation</h2>
         {rec ? (
           <>
-            <p className="muted" style={{ margin: 0 }}>Recommended (from your max of {max})</p>
+            <p className="muted small">From your max of {max} reps</p>
             <p className="reco-sets">{rec.join(" · ")}</p>
-            <label style={{ marginTop: 0 }}>x (extra reps on sets 2 and 5)</label>
+            <label>x (extra reps on sets 2 and 5)</label>
             <Stepper value={x} onChange={setX} min={0} max={50} />
-            <button className="primary" style={{ marginTop: 12 }} onClick={() => { setSets(5); setReps(rec.map(String)); }}>
-              Use recommended
-            </button>
+            <button className="btn" onClick={() => { setSets(5); setReps(rec.map(String)); }}>Use recommended</button>
           </>
         ) : (
-          <p className="muted" style={{ margin: 0 }}>
-            No recommendation yet — you haven't done an assessment for this exercise.
-          </p>
+          <p className="muted small">No recommendation yet. Do an assessment for this exercise first.</p>
         )}
-      </div>
+      </section>
 
-      <label>Number of sets (1–{MAX_SETS})</label>
-      <Stepper value={sets} onChange={setSets} min={1} max={MAX_SETS} />
+      <section className="layer">
+        <h2 className="layer-label">Your plan</h2>
+        <label>Number of sets (1–{MAX_SETS})</label>
+        <Stepper value={sets} onChange={setSets} min={1} max={MAX_SETS} />
 
-      <label>Reps per set</label>
-      {reps.slice(0, sets).map((v, k) => (
-        <div key={k} className="setrow">
-          <span>Set {k + 1}</span>
-          <input type="number" min="1" value={v} onChange={(e) => setReps(reps.map((o, j) => (j === k ? e.target.value : o)))} />
-        </div>
-      ))}
+        <label>Reps per set</label>
+        {reps.slice(0, sets).map((v, k) => (
+          <div key={k} className="setrow">
+            <span>Set {k + 1}</span>
+            <input type="number" min="1" value={v} onChange={(e) => setReps(reps.map((o, j) => (j === k ? e.target.value : o)))} />
+          </div>
+        ))}
 
-      <label>Rest between sets</label>
-      <Stepper value={rest} onChange={setRest} min={10} max={600} step={10} display={fmt} />
+        <label>Rest between sets</label>
+        <Stepper value={rest} onChange={setRest} min={10} max={600} step={10} display={fmt} />
+      </section>
 
       <button className="primary huge" disabled={!valid || busy} onClick={submit}>Save plan</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
       <DeleteExercise exercise={exercise} onDelete={onDeleteExercise} />
-    </section>
+    </>
   );
 }
 
@@ -360,23 +439,27 @@ function Assessment({ exercise, onSave, onBack }) {
   };
 
   return (
-    <section>
-      <h1>{exercise} — assessment</h1>
+    <>
+      <SubHead backLabel={exercise} onBack={onBack} title="Assessment">
+        <span className="badge">max reps test</span>
+      </SubHead>
+      <section className="layer stage">
+        {count === null && <p className="muted center">A 3-second countdown, then do as many reps as you can.</p>}
+        {count > 0 && <div key={count} className="clock pop">{count}</div>}
+        {count === 0 && (
+          <>
+            <div className="clock go pop">GO</div>
+            <p className="muted center">Do as many reps as you can, then log it.</p>
+            <div className="row">
+              <input type="number" min="0" autoFocus value={reps} placeholder="Max reps" onChange={(e) => setReps(e.target.value)} />
+              <button className="primary" onClick={submit}>Save</button>
+            </div>
+          </>
+        )}
+        {err && <p className="error">{err}</p>}
+      </section>
       {count === null && <button className="primary huge" onClick={() => { unlockAudio(); setCount(3); }}>Start</button>}
-      {count > 0 && <div key={count} className="clock pop">{count}</div>}
-      {count === 0 && (
-        <>
-          <div className="clock go pop">GO!</div>
-          <p className="muted center">Do as many reps as you can, then log it.</p>
-          <div className="row">
-            <input type="number" min="0" autoFocus value={reps} placeholder="Max reps" onChange={(e) => setReps(e.target.value)} />
-            <button className="primary" onClick={submit}>Save</button>
-          </div>
-        </>
-      )}
-      {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
-    </section>
+    </>
   );
 }
 
@@ -416,8 +499,12 @@ function Training({ exercise, max, plan: saved, onSave, onBack }) {
   const C = 2 * Math.PI * 60;
 
   return (
-    <section>
-      <h1>{exercise} — training</h1>
+    <>
+      <SubHead backLabel={phase === "setup" ? exercise : "Quit (not saved)"} onBack={onBack} title="Daily training">
+        <span className="badge" style={{ "--tint": TEAL }}>{plan.length} sets</span>
+        <span className="badge badge-mono">rest {fmt(restSecs)}</span>
+      </SubHead>
+
       {phase !== "setup" && (
         <div className="dots">
           {plan.map((_, k) => (
@@ -425,31 +512,38 @@ function Training({ exercise, max, plan: saved, onSave, onBack }) {
           ))}
         </div>
       )}
+
       {phase === "setup" && (
         <>
-          {saved ? (
-            <p className="muted">Your plan: {plan.join(", ")} reps · rest {fmt(restSecs)}</p>
-          ) : (
-            <>
-              <p className="muted">No saved plan — using the recommended pattern from your max of {max}: {plan.join(", ")}</p>
-              <label>Your x (extra reps on sets 2 and 5)</label>
-              <input type="number" min="0" value={x} onChange={(e) => setX(e.target.value)} style={{ marginTop: 8 }} />
-            </>
-          )}
+          <section className="layer">
+            <h2 className="layer-label">{saved ? "Your plan" : "Recommended from your max"}</h2>
+            <p className="reco-sets">{plan.join(" · ")}</p>
+            {!saved && (
+              <>
+                <p className="muted small">No saved plan, so this uses your max of {max}.</p>
+                <label>Your x (extra reps on sets 2 and 5)</label>
+                <input type="number" min="0" value={x} onChange={(e) => setX(e.target.value)} />
+              </>
+            )}
+          </section>
           <button className="primary huge" onClick={() => { unlockAudio(); setPhase("set"); }}>Begin</button>
         </>
       )}
+
       {phase === "set" && (
         <>
-          <p className="muted center">Set {i + 1} of {plan.length}</p>
-          <div key={i} className="clock pop">{plan[i]}</div>
-          <p className="muted center">reps</p>
+          <section className="layer stage">
+            <h2 className="layer-label center">Set {i + 1} of {plan.length}</h2>
+            <div key={i} className="clock pop">{plan[i]}</div>
+            <p className="muted center">reps</p>
+          </section>
           <button className="primary huge" onClick={finishSet}>Set done</button>
         </>
       )}
+
       {phase === "rest" && (
-        <>
-          <p className="muted center">Rest — next: set {i + 2} ({plan[i + 1]} reps)</p>
+        <section className="layer stage">
+          <h2 className="layer-label center">Rest · next: set {i + 2} ({plan[i + 1]} reps)</h2>
           <div className="ring">
             <svg viewBox="0 0 140 140">
               <circle className="ring-bg" cx="70" cy="70" r="60" />
@@ -462,24 +556,25 @@ function Training({ exercise, max, plan: saved, onSave, onBack }) {
             <div className="ring-time">{fmt(left)}</div>
           </div>
           <div className="row">
-            <button onClick={() => { setLeft((l) => l + 10); setTotal((t) => t + 10); }}>+10s</button>
+            <button className="btn" onClick={() => { setLeft((l) => l + 10); setTotal((t) => t + 10); }}>+10s</button>
             <button className="primary" onClick={nextSet}>Skip rest</button>
           </div>
-        </>
+        </section>
       )}
+
       {phase === "effort" && (
-        <>
-          <p className="muted center">Done! How hard was it? (1 easy – 5 max effort)</p>
-          <div className="row">
+        <section className="layer stage">
+          <h2 className="layer-label center">Done! How hard was it?</h2>
+          <p className="muted center small">1 easy – 5 max effort</p>
+          <div className="efforts">
             {[1, 2, 3, 4, 5].map((n) => (
-              <button key={n} className="big" onClick={() => submit(n)}>{n}</button>
+              <button key={n} className="effort" onClick={() => submit(n)}>{n}</button>
             ))}
           </div>
-        </>
+        </section>
       )}
       {err && <p className="error">{err}</p>}
-      {phase !== "effort" && <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Quit (this session is not saved)</button>}
-    </section>
+    </>
   );
 }
 
@@ -496,23 +591,24 @@ function AdHoc({ exercise, onSave, onBack }) {
   };
 
   return (
-    <section>
-      <h1>{exercise} — ad-hoc</h1>
-      <p className="muted">Log extra reps done outside your normal training.</p>
-      <label>Reps</label>
-      <div className="row">
+    <>
+      <SubHead backLabel={exercise} onBack={onBack} title="Ad-hoc">
+        <span className="badge" style={{ "--tint": VIOLET }}>extra reps</span>
+      </SubHead>
+      <section className="layer">
+        <h2 className="layer-label">Log reps done outside your normal training</h2>
+        <label>Reps</label>
         <input type="number" min="1" autoFocus value={reps} placeholder="e.g. 15" onChange={(e) => setReps(e.target.value)} />
-      </div>
-      <label>Effort (1 easy – 5 max effort)</label>
-      <div className="row">
-        {[1, 2, 3, 4, 5].map((k) => (
-          <button key={k} className={effort === k ? "big sel" : "big"} onClick={() => setEffort(k)}>{k}</button>
-        ))}
-      </div>
+        <label>Effort (1 easy – 5 max effort)</label>
+        <div className="efforts">
+          {[1, 2, 3, 4, 5].map((k) => (
+            <button key={k} className={effort === k ? "effort sel" : "effort"} aria-pressed={effort === k} onClick={() => setEffort(k)}>{k}</button>
+          ))}
+        </div>
+      </section>
       <button className="primary huge" disabled={!(n > 0) || !effort || busy} onClick={submit}>Save</button>
       {err && <p className="error">{err}</p>}
-      <button className="secondary-btn"  style={{ marginTop: 20}} onClick={onBack}>Back</button>
-    </section>
+    </>
   );
 }
 
@@ -524,7 +620,7 @@ function Stats({ sessions, custom, onDelete }) {
   const colorOf = (n) => COLORS[allNames.indexOf(n) % COLORS.length];
 
   if (!sessions.length && !custom.length)
-    return <section><h1>My stats</h1><p className="muted">Nothing logged yet.</p></section>;
+    return <section className="layer dashed"><p className="muted center">Nothing logged yet. Pick an exercise to get started.</p></section>;
 
   // A Set only keeps unique values, so each calendar day is counted once
   const daysActive = new Set(sessions.map((s) => dayKey(s.ts))).size;
@@ -538,39 +634,44 @@ function Stats({ sessions, custom, onDelete }) {
   const tmax = Math.max(1, ...rows.map((r) => r.total));
 
   return (
-    <section>
-      <h1>My stats</h1>
+    <>
       <div className="cards">
-        <div className="card"><b>{daysActive}</b><span>days active</span></div>
-        <div className="card"><b>{sessions.length}</b><span>sessions</span></div>
-        <div className="card"><b>{avgEffort}</b><span>avg effort</span></div>
+        <div className="card" style={{ "--tint": ACCENT }}><b>{daysActive}</b><span>days active</span></div>
+        <div className="card" style={{ "--tint": TEAL }}><b>{sessions.length}</b><span>sessions</span></div>
+        <div className="card" style={{ "--tint": AMBER }}><b>{avgEffort}</b><span>avg effort</span></div>
       </div>
 
-      <h2>Last 14 days</h2>
-      <div className="chips">
-        {["All", ...names].map((n) => (
-          <button key={n} className={filter === n ? "chip on" : "chip"} onClick={() => setFilter(n)}>{n}</button>
-        ))}
-      </div>
-      <Chart
-        key={filter}
-        sessions={filter === "All" ? sessions : sessions.filter((s) => s.exercise === filter)}
-        names={filter === "All" ? names : [filter]}
-        colorOf={colorOf}
-      />
-
-      <h2>By exercise</h2>
-      {rows.map((r) => (
-        <div key={r.n} className="hbar">
-          <div className="hbar-label"><span>{r.n}</span><span>max {r.max ?? "–"} · total {r.total}</span></div>
-          <div className="track"><div className="fill" style={{ width: `${(r.total / tmax) * 100}%`, background: colorOf(r.n) }} /></div>
+      <section className="layer">
+        <h2 className="layer-label">Last 14 days</h2>
+        <div className="chips">
+          {["All", ...names].map((n) => (
+            <button key={n} className={filter === n ? "chip on" : "chip"} aria-pressed={filter === n}
+              style={{ "--tint": n === "All" ? ACCENT : rgb(colorOf(n)) }} onClick={() => setFilter(n)}>
+              <span className="chip-dot" />
+              {n}
+            </button>
+          ))}
         </div>
-      ))}
+        <Chart
+          key={filter}
+          sessions={filter === "All" ? sessions : sessions.filter((s) => s.exercise === filter)}
+          names={filter === "All" ? names : [filter]}
+          colorOf={colorOf}
+        />
+      </section>
 
-
+      <section className="layer">
+        <h2 className="layer-label">By exercise</h2>
+        {rows.map((r) => (
+          <div key={r.n} className="hbar">
+            <div className="hbar-label"><span>{r.n}</span><span>max {r.max ?? "–"} · total {r.total}</span></div>
+            <div className="track"><div className="fill" style={{ width: `${(r.total / tmax) * 100}%`, background: colorOf(r.n) }} /></div>
+          </div>
+        ))}
+      </section>
 
       <DeleteAll onDelete={onDelete} />
-    </section>
+    </>
   );
 }
 
@@ -669,7 +770,7 @@ function DeleteAll({ onDelete }) {
   return (
     <div className="danger">
       {!open ? (
-        <button className="danger-btn" onClick={() => setOpen(true)}>Delete all data</button>
+        <button className="danger-btn" onClick={() => setOpen(true)}><Icon name="trash" />Delete all data</button>
       ) : (
         <div className="danger-box">
           <p>This permanently deletes every session, max, training plan, and custom exercise. It can't be undone.</p>
@@ -681,7 +782,7 @@ function DeleteAll({ onDelete }) {
             </button>
           </div>
           {err && <p className="error">{err}</p>}
-          <button className="secondary-btn"  style={{ marginTop: 20}} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
+          <button className="btn" onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
         </div>
       )}
     </div>
@@ -703,7 +804,7 @@ function DeleteExercise({ exercise, onDelete }) {
   return (
     <div className="danger">
       {!open ? (
-        <button className="danger-btn" onClick={() => setOpen(true)}>Delete exercise</button>
+        <button className="danger-btn" onClick={() => setOpen(true)}><Icon name="trash" />Delete exercise</button>
       ) : (
         <div className="danger-box">
           <p>This permanently deletes every session, max, training plan, and ad-hoc log for "{exercise}". It can't be undone.</p>
@@ -715,7 +816,7 @@ function DeleteExercise({ exercise, onDelete }) {
             </button>
           </div>
           {err && <p className="error">{err}</p>}
-          <button className="secondary-btn" style={{ marginTop: 10 }} onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
+          <button className="btn" onClick={() => { setOpen(false); setText(""); }}>Cancel</button>
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@ const pub_apps = [
 
 const priv_apps = [
   { name: "Local LLM", url: "https://app2.xtemplate.cc", icon: "chat", tint: "181, 140, 240" },
-  { name: "Workout", url: "https://app3.xtemplate.cc", icon: "dumbbell", tint: "111, 214, 196" },
+  { name: "Workout", url: "https://workout.xtemplate.cc", icon: "dumbbell", tint: "111, 214, 196" },
   { name: "Notes", url: "https://notes.xtemplate.cc", icon: "notes", tint: "143, 168, 255" },
 ];
 

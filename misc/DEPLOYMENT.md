@@ -26,7 +26,7 @@ Git push to main
 | `xtemplate.cc` | Landing page | No |
 | `app1.xtemplate.cc` | Currency converter | Yes |
 | `app2.xtemplate.cc` | Local LLM chat | Yes |
-| `app3.xtemplate.cc` | Exercise tracker | Yes |
+| `workout.xtemplate.cc` | Exercise tracker | Yes |
 
 ---
 
@@ -252,7 +252,7 @@ In the tunnel, open **Published application routes** and add one route per hostn
 | `xtemplate.cc` | `https://traefik.traefik.svc.cluster.local:443` |
 | `app1.xtemplate.cc` | `https://traefik.traefik.svc.cluster.local:443` |
 | `app2.xtemplate.cc` | `https://traefik.traefik.svc.cluster.local:443` |
-| `app3.xtemplate.cc` | `https://traefik.traefik.svc.cluster.local:443` |
+| `workout.xtemplate.cc` | `https://traefik.traefik.svc.cluster.local:443` |
 
 For every route, open **Additional settings, TLS** and turn on **No TLS Verify**. Traefik uses a
 self-signed certificate, and without this setting you get a 502 error.
@@ -367,7 +367,7 @@ Use a **private/incognito browser window** so old cookies do not interfere.
 
 1. Open `https://xtemplate.cc`. The landing page loads with no login.
 2. Click through to `https://app1.xtemplate.cc`. You are sent to GitHub, log in, and land on the app.
-3. Open `https://app2.xtemplate.cc` and `https://app3.xtemplate.cc`. They open **without** a second
+3. Open `https://app2.xtemplate.cc` and `https://workout.xtemplate.cc`. They open **without** a second
    login (the login cookie is shared across `.xtemplate.cc`).
 4. In app3, log a session, then reload. The data stays (it is stored on a persistent volume).
 5. Try a user who is not in the GitHub team. They should be refused.

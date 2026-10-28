@@ -20,7 +20,7 @@ login.
 | `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed + CARTO map tiles; saved stops and target bus/train in the browser's localStorage) | No (public) |
 | `https://architecture.xtemplate.cc` | Interactive architecture diagram of this lab (frontend only, static React build on nginx; content lives in `apps/architecture/src/data.js`) | No (public) |
 | `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
-| `https://app3.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
+| `https://workout.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
 | `https://argocd.xtemplate.cc` | Argo CD UI | Yes |
 | `https://console.xtemplate.cc` | Headlamp (cluster dashboard) | Yes |
 
@@ -50,7 +50,7 @@ flowchart LR
 
 1. **Getting in.** A visitor hits Cloudflare. Cloudflare passes the request down a tunnel that the
    `cloudflared` pod opened *from inside* the cluster, so the home router needs no port forwarding.
-2. **Routing.** Traefik looks at the hostname (`app3.xtemplate.cc`, etc.) and picks the right app.
+2. **Routing.** Traefik looks at the hostname (`workout.xtemplate.cc`, etc.) and picks the right app.
 3. **Login check.** Before reaching a protected app, Traefik asks oauth2-proxy "is this person signed in
    and in the right GitHub team?" If not, they're sent to the GitHub login page.
 4. **Deploying.** Pushing app code to `main` triggers that app's workflow. It builds the image, scans it,

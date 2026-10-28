@@ -13,9 +13,9 @@ spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - app3.xtemplate.cc
+        - workout.xtemplate.cc
   rules:
-    - host: app3.xtemplate.cc
+    - host: workout.xtemplate.cc
       http:
         paths:
           - path: /api

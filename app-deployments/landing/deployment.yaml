@@ -22,7 +22,7 @@ spec:
       containers:
         - name: nginx
           # Updated automatically by the build-image pipeline once this app has a workflow.
-          image: ghcr.io/xtemplate24/landing@sha256:1436eb542f2f206c61075bcf99bf656aa7eaeb041a8d4b1ed92b7ea2408efbda
+          image: ghcr.io/xtemplate24/landing@sha256:b1be75956d8d5d84be7b173d48feff893e3c111c537ab35cfecccf086f8eca65
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

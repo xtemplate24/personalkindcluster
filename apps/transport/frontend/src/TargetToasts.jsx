@@ -69,7 +69,7 @@ function BusToast({ target, onClose, onLabel }) {
     small = "No estimate right now";
   } else if (msLeft <= 60_000) {
     big = "Arr";
-    small = after  ? `Next bus at ${new Date(after.eta).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}` : "last estimate";
+    small = after  ? `Next at ${new Date(after.eta).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()}` : "last estimate";
   } else {
     big = countdown(msLeft);
     small = after ? `then ${Math.max(1, Math.floor((Date.parse(after.eta) - now) / 60000))} min` : "last estimate";

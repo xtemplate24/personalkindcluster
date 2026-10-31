@@ -1,0 +1,109 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: etcd-backup
+  labels:
+    # The pod mounts host folders and uses the host network, so it needs the
+    # "privileged" Pod Security level. Harmless if you don't enforce Pod Security.
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etcd-backup
+  namespace: etcd-backup
+spec:
+  schedule: "0 3 * * *"          # every day at 03:00
+  timeZone: Asia/Singapore
+  concurrencyPolicy: Forbid       # never run two backups at once
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2             # retry up to 2 times if it fails
+      activeDeadlineSeconds: 1800 # give up after 30 minutes
+      template:
+        spec:
+          restartPolicy: Never
+          # etcd only listens on 127.0.0.1 of the node, so the pod shares the node's network
+          hostNetwork: true
+          dnsPolicy: ClusterFirstWithHostNet
+          nodeSelector:
+            node-role.kubernetes.io/control-plane: "true"
+
+          initContainers:
+            - name: snapshot
+              image: registry.k8s.io/etcd:3.6.4-0
+              securityContext:
+                runAsUser: 0      # the etcd client key on the host is root-only
+              command:
+                - etcdctl
+                - --endpoints=https://127.0.0.1:2379
+                - --cacert=/etcd-certs/server-ca.crt
+                - --cert=/etcd-certs/client.crt
+                - --key=/etcd-certs/client.key
+                - snapshot
+                - save
+                - /backup/etcd-snapshot.db
+              volumeMounts:
+                - name: etcd-certs
+                  mountPath: /etcd-certs
+                  readOnly: true
+                - name: backup
+                  mountPath: /backup
+
+          containers:
+            - name: upload
+              image: rclone/rclone:1.74.3
+              securityContext:
+                runAsUser: 0      # needed to read the k3s token file on the host
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  TS=$(date +%Y-%m-%d_%H%M)
+
+                  # rclone wants a writable config (it refreshes the Google token),
+                  # so copy the read-only Secret into a temp folder first
+                  cp /rclone-secret/rclone.conf /tmp/rclone.conf
+                  export RCLONE_CONFIG=/tmp/rclone.conf
+
+                  echo "Compressing snapshot..."
+                  gzip -c /backup/etcd-snapshot.db > /backup/etcd-snapshot-$TS.db.gz
+                  ls -lh /backup
+
+                  echo "Uploading snapshot..."
+                  rclone copy /backup/etcd-snapshot-$TS.db.gz secret:snapshots/ -v
+
+                  # The k3s token is required to restore. Keep the latest copy alongside.
+                  rclone copyto /k3s-token secret:k3s-token -v
+
+                  echo "Deleting snapshots older than 30 days..."
+                  rclone delete secret:snapshots/ --min-age 30d --drive-use-trash=false -v
+
+                  echo "Backups now in Google Drive:"
+                  rclone ls secret:snapshots/
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: rclone-secret
+                  mountPath: /rclone-secret
+                  readOnly: true
+                - name: k3s-token
+                  mountPath: /k3s-token
+                  readOnly: true
+
+          volumes:
+            - name: backup
+              emptyDir: {}        # scratch space, wiped when the pod ends
+            - name: etcd-certs
+              hostPath:
+                path: /var/lib/rancher/k3s/server/tls/etcd
+                type: Directory
+            - name: k3s-token
+              hostPath:
+                path: /var/lib/rancher/k3s/server/token
+                type: File
+            - name: rclone-secret
+              secret:
+                secretName: rclone-config

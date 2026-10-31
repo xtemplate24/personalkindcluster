@@ -22,7 +22,7 @@ spec:
       containers:
         - name: nginx
           # CI replaces this line with image@sha256:<digest> after the first build.
-          image: ghcr.io/xtemplate24/architecture@sha256:8d069e8855f1555a1b8f9c051e6fc6f20a1cf2df73adb536e799f7c0b8d89f57
+          image: ghcr.io/xtemplate24/architecture@sha256:b7e5fabc6f72d685e53116fc8d5f9a3e78b2c0517daad675a2ce07ff0db76baa
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

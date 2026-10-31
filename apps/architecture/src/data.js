@@ -299,6 +299,15 @@ export const requestPath = {
         about: "Alertmanager posts firing and resolved alerts to a Discord webhook.",
         facts: ["Noisy info-level and heartbeat alerts are dropped"],
       },
+      {
+        id: "gdrive",
+        name: "Google Drive",
+        sub: "backup",
+        icon: "disk",
+        access: "external",
+        about: "Etcd backups are encrypted and synced to a Google Drive account",
+        facts: ["5 Days local copy, 30 Days backup in the cloud"],
+      },
     ],
   },
 };

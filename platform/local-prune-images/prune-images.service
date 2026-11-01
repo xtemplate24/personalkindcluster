@@ -1,0 +1,6 @@
+   [Unit]
+   Description=Prune old container images (keep newest 3 per repo)
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/local/bin/prune-images.sh

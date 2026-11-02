@@ -221,7 +221,7 @@ function SubHead({ backLabel, onBack, title, children }) {
 export default function App() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [screen, setScreen] = useState("home"); // home | mode | assess | train | adhoc | plan | stats
+  const [screen, setScreen] = useState("home"); // home | mode | assess | train | adhoc | plan | sessions | stats
   const [exercise, setExercise] = useState(null);
   const [newName, setNewName] = useState("");
 
@@ -262,6 +262,12 @@ export default function App() {
     await refresh();
     setExercise(null);
     setScreen("home");
+  };
+
+  // Removes one logged session; stays on the sessions screen so you can keep tidying.
+  const deleteSession = async (id) => {
+    await call("/session", { method: "DELETE", body: { id } });
+    await refresh();
   };
 
   if (error) return <div className="page"><p className="error">{error} — try reloading.</p></div>;
@@ -356,10 +362,16 @@ export default function App() {
               </div>
             </section>
 
-            <button className="pill-btn" onClick={() => setScreen("plan")}>
-              <Icon name="list" />
-              {plan ? "Change training plan" : "Set training plan"}
-            </button>
+            <div className="pill-row">
+              <button className="pill-btn" onClick={() => setScreen("plan")}>
+                <Icon name="list" />
+                {plan ? "Change training plan" : "Set training plan"}
+              </button>
+              <button className="pill-btn" onClick={() => setScreen("sessions")}>
+                <Icon name="history" />
+                Edit sessions
+              </button>
+            </div>
           </>
         )}
 
@@ -367,6 +379,10 @@ export default function App() {
         {screen === "train" && <Training exercise={exercise} max={max} plan={plan} onSave={save} onBack={toMode} />}
         {screen === "adhoc" && <AdHoc exercise={exercise} onSave={save} onBack={toMode} />}
         {screen === "plan" && <PlanEditor exercise={exercise} plan={plan} max={max} onSave={savePlan} onDeleteExercise={deleteExercise} onBack={toMode} />}
+        {screen === "sessions" && (
+          <SessionList exercise={exercise} tint={tintOf(exercise)} onDelete={deleteSession} onBack={toMode}
+            sessions={data.sessions.filter((s) => s.exercise === exercise)} />
+        )}
         {screen === "stats" && <Stats sessions={data.sessions} custom={data.custom} onDelete={deleteAll} />}
       </main>
     </div>
@@ -634,6 +650,104 @@ function AdHoc({ exercise, onSave, onBack }) {
         </div>
       </section>
       <button className="primary huge" disabled={!(n > 0) || !effort || busy} onClick={submit}>Save</button>
+      {err && <p className="error">{err}</p>}
+    </>
+  );
+}
+
+const KINDS = {
+  assessment: { label: "Assessment", icon: "target", tint: ACCENT },
+  training: { label: "Training", icon: "repeat", tint: TEAL },
+  adhoc: { label: "Ad-hoc", icon: "plus", tint: VIOLET },
+};
+const dayTitle = (ts) => {
+  const d = new Date(ts);
+  const today = new Date();
+  const yest = new Date(); yest.setDate(today.getDate() - 1);
+  if (dayKey(d) === dayKey(today)) return "Today";
+  if (dayKey(d) === dayKey(yest)) return "Yesterday";
+  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+};
+const timeOf = (ts) => new Date(ts).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+// Every logged session for one exercise, newest first, grouped by day, each with its own delete.
+function SessionList({ exercise, tint, sessions, onDelete, onBack }) {
+  const [confirm, setConfirm] = useState(null); // id of the row asking "delete?"
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  // The newest assessment is the one that sets "max", so we warn before deleting it
+  const lastAssessId = [...sessions].reverse().find((s) => s.kind === "assessment")?.id;
+  const groups = [];
+  [...sessions].reverse().forEach((s) => {
+    const title = dayTitle(s.ts);
+    const g = groups[groups.length - 1];
+    if (g && g.title === title) g.items.push(s);
+    else groups.push({ title, items: [s] });
+  });
+  const totalReps = sessions.reduce((a, s) => a + s.reps, 0);
+
+  const go = async (id) => {
+    setBusy(true);
+    setErr(null);
+    try { await onDelete(id); setConfirm(null); }
+    catch (e) { setErr(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      <SubHead backLabel={exercise} onBack={onBack} title="Sessions">
+        <span className="badge" style={{ "--tint": tint }}>{sessions.length} session{sessions.length === 1 ? "" : "s"}</span>
+        <span className="badge badge-mono">{totalReps} reps total</span>
+      </SubHead>
+
+      {!sessions.length && (
+        <section className="layer dashed"><p className="muted center">Nothing logged for {exercise} yet.</p></section>
+      )}
+
+      {groups.map((g) => (
+        <section key={g.title} className="layer">
+          <h2 className="layer-label">{g.title}</h2>
+          <ul className="sess-list">
+            {g.items.map((s) => {
+              const k = KINDS[s.kind] || KINDS.adhoc;
+              const asking = confirm === s.id;
+              return (
+                <li key={s.id} className={`sess${asking ? " asking" : ""}`} style={{ "--tint": k.tint }}>
+                  <span className="sess-icon"><Icon name={k.icon} /></span>
+                  <span className="sess-text">
+                    <span className="sess-kind">{k.label}</span>
+                    <span className="sess-meta">
+                      {timeOf(s.ts)}{s.effort ? ` · effort ${s.effort}/5` : ""}
+                    </span>
+                  </span>
+                  <span className="sess-reps"><b>{s.reps}</b><small>{s.kind === "assessment" ? "max" : "reps"}</small></span>
+                  {!asking && (
+                    <button className="sess-del" aria-label={`Delete ${k.label} session`} onClick={() => setConfirm(s.id)}>
+                      <Icon name="trash" />
+                    </button>
+                  )}
+                  {asking && (
+                    <div className="sess-confirm">
+                      <p>
+                        Delete this session?
+                        {s.id === lastAssessId && " It's your latest assessment, so your max will go back to the one before."}
+                      </p>
+                      <div className="row">
+                        <button className="btn" disabled={busy} onClick={() => setConfirm(null)}>Cancel</button>
+                        <button className="danger-btn solid" disabled={busy} onClick={() => go(s.id)}>
+                          {busy ? "Deleting…" : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
       {err && <p className="error">{err}</p>}
     </>
   );

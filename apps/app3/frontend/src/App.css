@@ -725,6 +725,52 @@ input:focus {
   .card b { font-size: 1.6rem; }
 }
 
+/* ---------- edit sessions ---------- */
+.pill-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.pill-row .pill-btn { flex: 1 1 200px; }
+
+.sess-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sess {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  transition: border-color 0.2s, background 0.2s;
+}
+.sess.asking { border-color: rgba(var(--danger-rgb), 0.55); background: rgba(var(--danger-rgb), 0.07); }
+.sess-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: rgb(var(--tint));
+  background: radial-gradient(circle at 30% 25%, rgba(var(--tint), 0.3), transparent 65%), var(--glass-bg);
+  border: var(--glass-border);
+}
+.sess-icon svg { width: 17px; height: 17px; }
+.sess-text { display: flex; flex-direction: column; min-width: 0; }
+.sess-kind { font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 0.92rem; color: var(--text-strong); }
+.sess-meta { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; color: var(--muted); }
+.sess-reps { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.sess-reps b { font-family: "Space Grotesk", sans-serif; font-size: 1.25rem; color: rgb(var(--tint)); }
+.sess-reps small { font-size: 0.68rem; color: var(--muted); }
+.sess-del {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.sess-del svg { width: 17px; height: 17px; }
+.sess-del:hover { color: var(--danger); border-color: rgba(var(--danger-rgb), 0.5); background: rgba(var(--danger-rgb), 0.1); }
+.sess-confirm { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; }
+.sess-confirm p { margin: 0; font-size: 0.86rem; line-height: 1.45; color: var(--text); }
+.sess-confirm .row { justify-content: flex-end; }
+.sess-confirm .btn, .sess-confirm .danger-btn { margin-top: 0; }
+
 /* ---------- tablets and up ---------- */
 @media (min-width: 720px) {
   .layer { padding: 18px; }

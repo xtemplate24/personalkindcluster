@@ -26,7 +26,9 @@ db.exec(`
 const q = {
   customs: db.prepare("SELECT name FROM custom_exercises WHERE user = ? ORDER BY name"),
   addCustom: db.prepare("INSERT OR IGNORE INTO custom_exercises (user, name) VALUES (?, ?)"),
-  sessions: db.prepare("SELECT exercise, kind, reps, effort, ts FROM sessions WHERE user = ? ORDER BY ts, id"),
+  sessions: db.prepare("SELECT id, exercise, kind, reps, effort, ts FROM sessions WHERE user = ? ORDER BY ts, id"),
+  // "AND user = ?" makes sure people can only delete their own sessions
+  deleteSession: db.prepare("DELETE FROM sessions WHERE id = ? AND user = ?"),
   addSession: db.prepare(
     "INSERT INTO sessions (user, exercise, kind, reps, effort, ts) VALUES (?, ?, ?, ?, ?, ?)"
   ),
@@ -113,6 +115,13 @@ http
           q.deleteSessions.run(user);
           q.deleteCustoms.run(user);
           q.deletePlans.run(user);
+          return json(res, 200, { ok: true });
+        }
+        if (req.method === "DELETE" && p === "/api/session") {
+          const id = Number((await readBody(req)).id);
+          if (!Number.isInteger(id) || id < 1) return json(res, 400, { error: "bad session id" });
+          const r = q.deleteSession.run(id, user);
+          if (r.changes === 0) return json(res, 404, { error: "session not found" });
           return json(res, 200, { ok: true });
         }
         if (req.method === "DELETE" && p === "/api/exercise") {

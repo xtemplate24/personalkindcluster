@@ -1,7 +1,8 @@
 // Shared helpers: localStorage, API calls, time formatting.
 import { useEffect, useRef, useState } from "react";
 
-// Each favourites list (AM and PM) holds up to this many buses + stops.
+// Each favourites list (AM and PM) holds up to this many buses, and the
+// same number of stops.
 export const MAX_FAVS = 10;
 
 // ---------------------------------------------------------------------------

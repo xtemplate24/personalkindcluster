@@ -25,32 +25,30 @@ main { flex: 1; }
 }
 
 .back {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 22px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
-  color: var(--muted);
+  color: var(--text-soft);
   text-decoration: none;
-  transition: color 0.2s;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  transition: color 0.2s, border-color 0.2s;
 }
-.back:hover, .back:focus-visible { color: var(--accent); }
+.back:hover, .back:focus-visible { color: var(--accent); border-color: var(--glass-border-hover); }
 
 h1 {
   font-family: "Space Grotesk", sans-serif;
   font-weight: 600;
-  font-size: clamp(2rem, 4.5vw, 3rem);
-  line-height: 1.1;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.15;
   letter-spacing: -0.01em;
-  margin: 0 0 14px;
+  margin: 0 0 18px;
   color: var(--text-strong);
-}
-
-.lede {
-  font-size: 1.02rem;
-  line-height: 1.6;
-  color: var(--text-soft);
-  max-width: 46ch;
-  margin: 0 0 26px;
 }
 
 /* ---------- AM / PM switch: one glass pill with a sliding highlight ---------- */
@@ -69,11 +67,10 @@ h1 {
   z-index: 1;
   display: inline-flex;
   align-items: center;
-  flex-direction: column;
   justify-content: center;
-  gap: 1px;
-  min-width: 140px;
-  padding: 8px 22px;
+  gap: 8px;
+  min-width: 120px;
+  padding: 11px 22px;
   border: 0;
   background: none;
   border-radius: 999px;
@@ -98,8 +95,7 @@ h1 {
   transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
 }
 .switch.tab-pm .switch-thumb { transform: translateX(100%); }
-.switch-main { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; }
-.switch-sub { font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; opacity: 0.8; }
+
 
 /* ---------- toolbar: search + near me ---------- */
 .view { animation: rise 450ms ease-out both; }
@@ -161,6 +157,7 @@ h1 {
 .pill-btn:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); color: var(--accent); }
 .pill-btn:active { transform: scale(0.97); }
 .pill-btn:disabled { opacity: 0.6; cursor: progress; }
+.pill-btn.on { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.6); }
 .pill-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ---------- sections ---------- */
@@ -179,6 +176,9 @@ h1 {
   color: var(--muted);
 }
 .count { color: var(--text-soft); letter-spacing: 0.02em; }
+/* "Saved buses ... ☆ 3/10": label on the left, star + count pushed right */
+.section-title .grow { flex: 1; }
+.section-title .title-star { margin-right: -4px; }
 
 .empty, .loading {
   margin: 0;
@@ -266,8 +266,7 @@ h1 {
 }
 
 .chevron svg { transition: transform 0.25s ease; }
-.card.open > .card-head .chevron svg,
-.group.open > .group-head .chevron svg { transform: rotate(180deg); }
+.card.open > .card-head .chevron svg { transform: rotate(180deg); }
 
 .card-body {
   padding: 2px 14px 14px;
@@ -444,37 +443,37 @@ h1 {
 .busfav .etas { margin-top: 2px; }
 .busfav-actions { flex: none; display: flex; flex-direction: column; gap: 2px; }
 
-/* ---------- "Saved stops": one collapsible group holding the stop cards ---------- */
-.cards + .group { margin-top: 10px; }
-.group-head {
+/* ---------- "Your favourites": favourites folded into one button ----------
+   Shown instead of the favourites while searching or using "Near me". */
+.fav-toggle {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 8px 10px 20px;
-  border: 0;
-  background: none;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding: 10px 10px 10px 16px;
   color: var(--muted);
-  cursor: pointer;
   text-align: left;
   font: inherit;
+  cursor: pointer;
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  border-radius: var(--btn-radius);
+  box-shadow: var(--glass-shadow);
+  transition: border-color 0.2s, background 0.2s;
 }
-.group-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--panel-radius); }
-.group-head .section-title { flex: 1; margin: 0; }
+.fav-toggle:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); }
+.fav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.fav-toggle.open { border-color: rgba(var(--accent-rgb), 0.45); }
+.fav-toggle-star { flex: none; }
+.fav-toggle-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fav-toggle-title { font-family: "Space Grotesk", sans-serif; font-weight: 500; color: var(--text-strong); }
+.fav-toggle-sub { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; }
 .group-hint { font-size: 0.8rem; }
-.group-head .chevron { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; }
-.group-body { border-top: 1px solid rgba(var(--white-rgb), 0.08); }
-/* stop cards inside the group are flat rows, not glass-on-glass */
-.group-body .card {
-  background: none;
-  border: 0;
-  border-bottom: 1px solid rgba(var(--white-rgb), 0.06);
-  border-radius: 0;
-  box-shadow: none;
-  animation: none;
-}
-.group-body .card:last-child { border-bottom: 0; }
-.group-body .card.open { background: rgba(var(--white-rgb), 0.04); }
+.fav-toggle .chevron { display: inline-flex; width: 34px; height: 34px; align-items: center; justify-content: center; }
+.fav-toggle .chevron svg { transition: transform 0.25s ease; }
+.fav-toggle.open .chevron svg { transform: rotate(180deg); }
+.fav-folded { animation: rise 300ms ease-out both; }
 .fineprint strong { color: var(--text-soft); font-weight: 500; }
 
 /* ---------- map ---------- */

@@ -209,8 +209,9 @@ current folder, with today's date in the name.
 
 `transport.xtemplate.cc` is public, so it stores nothing on the server: favourites and the pinned bus
 live in each visitor's browser (`localStorage`). There are two favourites lists, AM (to work) and PM
-(from work), with up to 10 items each. An item is either one bus at one stop (shown at the top with live
-arrivals) or a whole stop (in the collapsed "Saved stops" group below). The backend only
+(from work). Each holds up to 10 saved buses (one bus at one stop, shown with live arrivals) and up to 10
+saved stops (each stop shown closed; tap it to see its buses). While you search or use "Near me", the
+favourites fold into one "Your favourites" button so the results come first. The backend only
 forwards and caches upstream data (15 s per stop) and rate-limits each visitor.
 
 | Data | Source | Key needed? |

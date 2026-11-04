@@ -33,6 +33,12 @@ export const PinIcon = (p) => (
   </Svg>
 );
 
+export const BackIcon = (p) => (
+  <Svg size={16} strokeWidth="1.7" {...p}>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </Svg>
+);
+
 export const SunIcon = (p) => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="4" />

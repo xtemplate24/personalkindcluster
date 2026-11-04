@@ -14,21 +14,26 @@ import StopMap from "./StopMap.jsx";
 
 const REFRESH_MS = 20_000;
 
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
 export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [nearby, setNearby] = useState(null); // null = not located yet
+  const [nearby, setNearby] = useState(null); // null = "Near me" is off
   const [position, setPosition] = useState(null);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState(null);
   const [focusCode, setFocusCode] = useState(null); // stop clicked on the map
-  const [stopsOpen, setStopsOpen] = useState(false); // the "Saved stops" group
+  // While searching or using "Near me", favourites fold into one button so
+  // the results come first. This is whether that button has been opened.
+  const [favsOpen, setFavsOpen] = useState(false);
 
   // ----- favourites (for the tab that's showing) -----
   const busFavs = favs.filter((f) => f.type === "bus");
   const stopFavs = favs.filter((f) => f.type === "stop");
-  const full = favs.length >= MAX_FAVS;
+  const busesFull = busFavs.length >= MAX_FAVS;
+  const stopsFull = stopFavs.length >= MAX_FAVS;
   const savedCodes = useMemo(() => [...new Set(favs.map((f) => f.code))], [favs]);
 
   const isStopFav = (code) => stopFavs.some((f) => f.code === code);
@@ -38,7 +43,7 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
     setFavs((list) => {
       const match = (f) => f.type === "stop" && f.code === stop.code;
       if (list.some(match)) return list.filter((f) => !match(f));
-      if (list.length >= MAX_FAVS) return list;
+      if (list.filter((f) => f.type === "stop").length >= MAX_FAVS) return list;
       return [...list, { type: "stop", code: stop.code, name: stop.name, road: stop.road, lat: stop.lat, lng: stop.lng }];
     });
 
@@ -46,7 +51,7 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
     setFavs((list) => {
       const match = (f) => f.type === "bus" && f.code === stop.code && f.no === no;
       if (list.some(match)) return list.filter((f) => !match(f));
-      if (list.length >= MAX_FAVS) return list;
+      if (list.filter((f) => f.type === "bus").length >= MAX_FAVS) return list;
       return [
         ...list,
         { type: "bus", code: stop.code, no, stopName: stop.name, road: stop.road, lat: stop.lat, lng: stop.lng },
@@ -55,6 +60,7 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
 
   // ----- search (debounced: waits until you stop typing for 300ms) -----
   useEffect(() => {
+    setFavsOpen(false); // a new search folds favourites away again
     const q = query.trim();
     if (q.length < 2) {
       setResults([]);
@@ -70,9 +76,14 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
     return () => clearTimeout(t);
   }, [query]);
 
-  // ----- "near me" -----
+  // ----- "near me" (press again to turn it off) -----
   const locate = () => {
     setError(null);
+    if (nearby) {
+      setNearby(null);
+      setPosition(null);
+      return;
+    }
     if (!("geolocation" in navigator)) {
       setError("Your browser doesn't support location.");
       return;
@@ -85,6 +96,7 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
         try {
           const d = await api(`bus/nearby?lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}`);
           setNearby(d.stops);
+          setFavsOpen(false);
         } catch (e) {
           setError(e.message);
         } finally {
@@ -106,17 +118,74 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
   const clearFocus = useMemo(() => () => setFocusCode(null), []);
 
   // Everything a bus row needs to draw its star and pin buttons.
-  const rowActions = { isBusFav, toggleBusFav, full, pinned, setPinned };
+  const rowActions = { isBusFav, toggleBusFav, busesFull, pinned, setPinned };
 
   const cardProps = (stop) => ({
     stop,
     starred: isStopFav(stop.code),
-    starDisabled: full && !isStopFav(stop.code),
+    starDisabled: stopsFull && !isStopFav(stop.code),
     onToggleStar: () => toggleStopFav(stop),
     rowActions,
   });
 
   const listName = tab.toUpperCase();
+  const searchActive = query.trim().length >= 2;
+  const folded = searchActive || nearby !== null;
+
+  const favourites = (
+    <>
+      <section className="section">
+        <h2 className="section-title" aria-label={`${listName} saved buses, ${busFavs.length} of ${MAX_FAVS}`}>
+          <span className="grow">Saved buses</span>
+          <StarIcon size={13} className="title-star" />
+          <span className="count">
+            {busFavs.length}/{MAX_FAVS}
+          </span>
+        </h2>
+        {busFavs.length === 0 ? (
+          <p className="empty">
+            Open a stop and tap the <StarIcon size={14} /> next to a bus to keep that bus, at that stop, here.
+          </p>
+        ) : (
+          <div className="cards">
+            {busFavs.map((f) => (
+              <BusFavCard
+                key={`b-${f.code}-${f.no}`}
+                fav={f}
+                onUnfav={() => toggleBusFav({ code: f.code }, f.no)}
+                pinned={pinned}
+                setPinned={setPinned}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="section">
+        <h2 className="section-title" aria-label={`${listName} saved stops, ${stopFavs.length} of ${MAX_FAVS}`}>
+          <span className="grow">Saved stops</span>
+          <StarIcon size={13} className="title-star" />
+          <span className="count">
+            {stopFavs.length}/{MAX_FAVS}
+          </span>
+        </h2>
+        {stopFavs.length === 0 ? (
+          <p className="empty">
+            Tap the <StarIcon size={14} /> on a stop to keep the whole stop here.
+          </p>
+        ) : (
+          <div className="cards">
+            {stopFavs.map((s) => (
+              <StopCard key={`s-${s.code}`} {...cardProps(s)} />
+            ))}
+          </div>
+        )}
+        <p className="fineprint">
+          Stars you add now go to the <strong>{listName}</strong> list.
+        </p>
+      </section>
+    </>
+  );
 
   return (
     <div className="view">
@@ -137,15 +206,43 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
             </button>
           )}
         </label>
-        <button className="pill-btn" onClick={locate} disabled={locating}>
+        <button
+          className={`pill-btn ${nearby ? "on" : ""}`}
+          onClick={locate}
+          disabled={locating}
+          aria-pressed={Boolean(nearby)}
+          title={nearby ? "Turn off Near me" : "Show stops near me"}
+        >
           <LocateIcon />
           <span>{locating ? "Locating…" : "Near me"}</span>
+          {nearby && <CloseIcon size={14} />}
         </button>
       </div>
 
       {error && <p className="notice notice-warn">{error}</p>}
 
-      {query.trim().length >= 2 && (
+      {folded ? (
+        <>
+          <button className={`fav-toggle ${favsOpen ? "open" : ""}`} onClick={() => setFavsOpen(!favsOpen)} aria-expanded={favsOpen}>
+            <StarIcon className="fav-toggle-star" />
+            <span className="fav-toggle-text">
+              <span className="fav-toggle-title">Your favourites</span>
+              <span className="fav-toggle-sub">
+                {listName} · {plural(busFavs.length, "bus", "buses")} · {plural(stopFavs.length, "stop", "stops")}
+              </span>
+            </span>
+            <span className="group-hint">{favsOpen ? "Hide" : "Show"}</span>
+            <span className="chevron">
+              <ChevronIcon />
+            </span>
+          </button>
+          {favsOpen && <div className="fav-folded">{favourites}</div>}
+        </>
+      ) : (
+        favourites
+      )}
+
+      {searchActive && (
         <section className="section">
           <h2 className="section-title">
             Search results {searching && <span className="spinner" aria-label="Loading" />}
@@ -158,60 +255,6 @@ export default function BusView({ tab, favs, setFavs, pinned, setPinned }) {
           </div>
         </section>
       )}
-
-      <section className="section">
-        <h2 className="section-title">
-          {listName} favourites <span className="count">{favs.length}/{MAX_FAVS}</span>
-        </h2>
-
-        {favs.length === 0 ? (
-          <p className="empty">
-            Tap the <StarIcon size={14} /> next to a bus to save that bus at that stop, or the one on a stop to save
-            the whole stop. They'll appear in your {listName} list.
-          </p>
-        ) : (
-          <>
-            {busFavs.length > 0 && (
-              <div className="cards">
-                {busFavs.map((f) => (
-                  <BusFavCard
-                    key={`b-${f.code}-${f.no}`}
-                    fav={f}
-                    onUnfav={() => toggleBusFav({ code: f.code }, f.no)}
-                    pinned={pinned}
-                    setPinned={setPinned}
-                  />
-                ))}
-              </div>
-            )}
-
-            {stopFavs.length > 0 && (
-              <div className={`card group ${stopsOpen ? "open" : ""}`}>
-                <button className="group-head" onClick={() => setStopsOpen(!stopsOpen)} aria-expanded={stopsOpen}>
-                  <span className="section-title">
-                    Saved stops <span className="count">· {stopFavs.length}</span>
-                  </span>
-                  <span className="group-hint">{stopsOpen ? "Hide" : "Show"}</span>
-                  <span className="chevron">
-                    <ChevronIcon />
-                  </span>
-                </button>
-                {stopsOpen && (
-                  <div className="group-body">
-                    {stopFavs.map((s) => (
-                      <StopCard key={`s-${s.code}`} {...cardProps(s)} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        <p className="fineprint">
-          Stars you add now go to the <strong>{listName}</strong> list.
-        </p>
-      </section>
 
       {nearby && (
         <section className="section">
@@ -331,7 +374,7 @@ function StopCard({ stop, starred, starDisabled, onToggleStar, rowActions, focus
           aria-label={starred ? "Remove stop from favourites" : "Favourite the whole stop"}
           title={
             starDisabled
-              ? `Favourites list is full (${MAX_FAVS}/${MAX_FAVS})`
+              ? `Saved stops are full (${MAX_FAVS}/${MAX_FAVS})`
               : starred
                 ? "Remove stop from favourites"
                 : "Favourite the whole stop"
@@ -348,7 +391,7 @@ function StopCard({ stop, starred, starDisabled, onToggleStar, rowActions, focus
   );
 }
 
-function Arrivals({ stop, isBusFav, toggleBusFav, full, pinned, setPinned }) {
+function Arrivals({ stop, isBusFav, toggleBusFav, busesFull, pinned, setPinned }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const now = useNow(1000);
@@ -391,12 +434,12 @@ function Arrivals({ stop, isBusFav, toggleBusFav, full, pinned, setPinned }) {
                 </span>
                 <button
                   className={`icon-btn star ${fav ? "on" : ""}`}
-                  disabled={full && !fav}
+                  disabled={busesFull && !fav}
                   aria-pressed={fav}
                   aria-label={fav ? `Remove bus ${svc.no} from favourites` : `Favourite bus ${svc.no} at this stop`}
                   title={
-                    full && !fav
-                      ? `Favourites list is full (${MAX_FAVS}/${MAX_FAVS})`
+                    busesFull && !fav
+                      ? `Saved buses are full (${MAX_FAVS}/${MAX_FAVS})`
                       : fav
                         ? "Remove from favourites"
                         : "Favourite this bus at this stop"

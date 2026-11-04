@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 // Each app: name, link, which icon to draw, and a glow colour (r, g, b).
 const pub_apps = [
   { name: "Currency Converter", url: "https://app1.xtemplate.cc", icon: "currency", tint: "103, 232, 249" },
-  { name: "Bus & MRT", url: "https://transport.xtemplate.cc", icon: "bus", tint: "242, 166, 90" },
+  { name: "Bus Timings", url: "https://transport.xtemplate.cc", icon: "bus", tint: "242, 166, 90" },
   { name: "Architecture", url: "https://architecture.xtemplate.cc", icon: "diagram", tint: "111, 214, 196" },
 ];
 

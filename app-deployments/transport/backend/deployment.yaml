@@ -29,7 +29,7 @@ spec:
             #   kubectl create secret generic transport-lta -n transport \
             #     --from-literal=account-key='<your key>'
             # optional: true = the pod still starts without it and falls back
-            # to the keyless BusRouter feeds (and no MRT disruption alerts).
+            # to the keyless BusRouter feeds.
             - name: LTA_ACCOUNT_KEY
               valueFrom:
                 secretKeyRef:

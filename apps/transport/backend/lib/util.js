@@ -1,4 +1,4 @@
-// Small helpers shared by the bus and MRT modules.
+// Small helpers used by the bus module.
 
 // ---------- tiny in-memory cache ----------
 // Keeps upstream calls low: many visitors looking at the same bus stop within

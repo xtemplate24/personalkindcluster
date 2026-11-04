@@ -16,24 +16,6 @@ const Svg = ({ children, size = 18, ...rest }) => (
   </svg>
 );
 
-export const BusIcon = (p) => (
-  <Svg {...p}>
-    <rect x="4" y="3" width="16" height="15" rx="3" />
-    <path d="M4 11h16M8 18v2.5M16 18v2.5" />
-    <circle cx="8" cy="14.5" r="0.6" fill="currentColor" />
-    <circle cx="16" cy="14.5" r="0.6" fill="currentColor" />
-  </Svg>
-);
-
-export const TrainIcon = (p) => (
-  <Svg {...p}>
-    <rect x="5" y="3" width="14" height="14" rx="4" />
-    <path d="M5 10h14M8.5 21l2-4M15.5 21l-2-4" />
-    <circle cx="9" cy="13.5" r="0.6" fill="currentColor" />
-    <circle cx="15" cy="13.5" r="0.6" fill="currentColor" />
-  </Svg>
-);
-
 export const StarIcon = ({ filled, ...p }) => (
   <Svg {...p}>
     <path
@@ -43,11 +25,24 @@ export const StarIcon = ({ filled, ...p }) => (
   </Svg>
 );
 
-export const TargetIcon = (p) => (
+// Push-pin (the map-pin shape is already used by "Near me").
+export const PinIcon = (p) => (
   <Svg {...p}>
-    <circle cx="12" cy="12" r="8" />
-    <circle cx="12" cy="12" r="3.5" />
-    <path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3" />
+    <path d="M12 17v5" />
+    <path d="M9 10.8a2 2 0 01-1.1 1.8l-1.8.9A2 2 0 005 15.2v.8a1 1 0 001 1h12a1 1 0 001-1v-.8a2 2 0 00-1.1-1.8l-1.8-.9a2 2 0 01-1.1-1.8V7a1 1 0 011-1 2 2 0 000-4H8a2 2 0 000 4 1 1 0 011 1z" />
+  </Svg>
+);
+
+export const SunIcon = (p) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4" />
+  </Svg>
+);
+
+export const MoonIcon = (p) => (
+  <Svg {...p}>
+    <path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z" />
   </Svg>
 );
 
@@ -81,13 +76,6 @@ export const CloseIcon = (p) => (
 export const ChevronIcon = (p) => (
   <Svg {...p}>
     <path d="M6 9l6 6 6-6" />
-  </Svg>
-);
-
-export const AlertIcon = (p) => (
-  <Svg {...p}>
-    <path d="M12 3.5L2.5 20h19z" />
-    <path d="M12 10v4.5M12 17.2v.3" />
   </Svg>
 );
 

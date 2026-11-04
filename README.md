@@ -17,7 +17,7 @@ login.
 |---|---|---|
 | `https://xtemplate.cc` | Landing page with links to everything below | No |
 | `https://app1.xtemplate.cc` | Currency converter (React frontend + Express backend, live rates or a custom rate) | See [gaps](#known-gaps--leftovers) |
-| `https://transport.xtemplate.cc` | Singapore bus & MRT arrivals (React frontend + Express backend; LTA DataMall + SMRT feed + CARTO map tiles; saved stops and target bus/train in the browser's localStorage) | No (public) |
+| `https://transport.xtemplate.cc` | Singapore bus arrivals (React frontend + Express backend; LTA DataMall + CARTO map tiles; AM/PM favourites and the pinned bus in the browser's localStorage) | No (public) |
 | `https://architecture.xtemplate.cc` | Interactive architecture diagram of this lab (frontend only, static React build on nginx; content lives in `apps/architecture/src/data.js`) | No (public) |
 | `https://app2.xtemplate.cc` | Local LLM chat (custom React UI + llama.cpp server, Qwen2.5-3B Q4) | Yes |
 | `https://workout.xtemplate.cc` | Exercise tracker (assessment / training / ad-hoc modes, plans, stats; SQLite on a persistent volume) | Yes |
@@ -205,17 +205,17 @@ current folder, with today's date in the name.
 
 ---
 
-### The transport app (bus & MRT)
+### The transport app (bus timings)
 
-`transport.xtemplate.cc` is public, so it stores nothing on the server: saved stops/stations (up to 10
-each) and the "target" bus/train live in each visitor's browser (`localStorage`). The backend only
-forwards and caches upstream data (15 s per stop/station) and rate-limits each visitor.
+`transport.xtemplate.cc` is public, so it stores nothing on the server: favourites and the pinned bus
+live in each visitor's browser (`localStorage`). There are two favourites lists, AM (to work) and PM
+(from work), with up to 10 items each. An item is either one bus at one stop (shown at the top with live
+arrivals) or a whole stop (in the collapsed "Saved stops" group below). The backend only
+forwards and caches upstream data (15 s per stop) and rate-limits each visitor.
 
 | Data | Source | Key needed? |
 |---|---|---|
 | Bus stops + live bus arrivals | LTA DataMall (`v3/BusArrival`, `BusStops`) | Yes, free. Without it the app falls back to the community BusRouter feeds. |
-| MRT disruption alerts | LTA DataMall (`TrainServiceAlerts`) | Yes |
-| Live train times | SMRT's train-arrival feed (unofficial) | No. SMRT lines only: NSL, EWL, CCL, TEL, BPLRT |
 | Map tiles | CARTO dark basemap (Leaflet), plus "Open in Google Maps" links | Yes, free (since Sept 2026). Without it the map falls back to standard OpenStreetMap tiles. |
 
 Add the LTA key (get one at datamall.lta.gov.sg, "Request for API Access"):

@@ -1,7 +1,8 @@
-// Shared helpers: localStorage, API calls, time formatting, line colours.
+// Shared helpers: localStorage, API calls, time formatting.
 import { useEffect, useRef, useState } from "react";
 
-export const MAX_SAVED = 10;
+// Each favourites list (AM and PM) holds up to this many buses + stops.
+export const MAX_FAVS = 10;
 
 // ---------------------------------------------------------------------------
 // localStorage — this is a public app, so everything a visitor saves lives
@@ -10,6 +11,16 @@ export const MAX_SAVED = 10;
 // (private mode, strict browser settings) and the app should still work.
 // ---------------------------------------------------------------------------
 const PREFIX = "transport.";
+
+// Keys from the old bus + MRT version of the app. Favourites were redesigned
+// (AM/PM lists), so the old ones are simply dropped.
+try {
+  for (const k of ["mode", "savedStops", "savedStations", "targetBus", "targetTrain"]) {
+    localStorage.removeItem(PREFIX + k);
+  }
+} catch {
+  /* storage unavailable */
+}
 
 export function load(key, fallback) {
   try {
@@ -38,7 +49,7 @@ export function useStored(key, fallback) {
 
 // ---------------------------------------------------------------------------
 // API — all calls go to our own frontend server, which forwards to the
-// backend inside the cluster. The browser never talks to LTA/SMRT directly.
+// backend inside the cluster. The browser never talks to LTA directly.
 // ---------------------------------------------------------------------------
 // Difference between the server's clock and this device's clock. Bus ETAs
 // are absolute timestamps, so a phone whose clock is a minute off would show
@@ -47,7 +58,7 @@ let clockOffset = 0;
 export const serverNow = () => Date.now() + clockOffset;
 
 // Several parts of the page can ask for the same thing at once (a stop card
-// and the target toast both watch the same stop), so share results for a
+// and the pinned-bus bar both watch the same stop), so share results for a
 // few seconds instead of fetching twice.
 const recent = new Map(); // path -> { at, promise }
 const SHARE_MS = 5000;
@@ -142,33 +153,7 @@ const SG_TIME = new Intl.DateTimeFormat("en-SG", {
 export const clockTime = (ms) => (Number.isFinite(ms) ? SG_TIME.format(new Date(ms)) : null);
 
 // ---------------------------------------------------------------------------
-// MRT line colours (official LTA palette)
-// ---------------------------------------------------------------------------
-const LINE_COLOURS = {
-  NS: "#d42e12", // North-South
-  EW: "#009645", // East-West
-  CG: "#009645", // Changi Airport branch
-  CC: "#fa9e0d", // Circle
-  CE: "#fa9e0d", // Circle extension
-  NE: "#9900aa", // North East
-  DT: "#005ec4", // Downtown
-  TE: "#9d5b25", // Thomson-East Coast
-  BP: "#748477", // Bukit Panjang LRT
-  SW: "#748477",
-  SE: "#748477",
-  PW: "#748477",
-  PE: "#748477",
-  ST: "#748477",
-  PT: "#748477",
-};
-
-export const lineColour = (code) => LINE_COLOURS[String(code).slice(0, 2).toUpperCase()] || "#8ea3a7";
-
-// ---------------------------------------------------------------------------
 // Google Maps links (no API key needed)
 // ---------------------------------------------------------------------------
 export const gmapsDirections = (lat, lng) =>
   `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=walking`;
-
-export const gmapsSearch = (query) =>
-  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;

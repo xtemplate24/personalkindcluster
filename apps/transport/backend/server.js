@@ -1,6 +1,5 @@
 import express from "express";
 import * as bus from "./lib/bus.js";
-import * as mrt from "./lib/mrt.js";
 import { rateLimit } from "./lib/util.js";
 
 const app = express();
@@ -77,34 +76,10 @@ app.get(
   })
 );
 
-// ---------------------------- MRT ----------------------------
-
-// GET /api/mrt/stations
-app.get(
-  "/api/mrt/stations",
-  route(async (req, res) => res.json({ stations: await mrt.getStations() }))
-);
-
-// GET /api/mrt/arrivals?station=Paya%20Lebar
-app.get(
-  "/api/mrt/arrivals",
-  route(async (req, res) => {
-    const station = await mrt.resolveStation(req.query.station);
-    if (!station) return res.status(404).json({ error: "Unknown station." });
-    res.json(await mrt.getTrainArrivals(station));
-  })
-);
-
-// GET /api/mrt/alerts
-app.get(
-  "/api/mrt/alerts",
-  route(async (req, res) => res.json(await mrt.getTrainAlerts()))
-);
-
 // ---------------------------- meta ----------------------------
 
 app.get("/api/info", (req, res) => {
-  res.json({ busSource: bus.busSource, alerts: Boolean(process.env.LTA_ACCOUNT_KEY) });
+  res.json({ busSource: bus.busSource });
 });
 
 app.use("/api", (req, res) => res.status(404).json({ error: "not found" }));
